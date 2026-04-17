@@ -1,0 +1,307 @@
+// Neta Watch — Prisma Schema
+// Local dev: SQLite | Production: PostgreSQL (Supabase)
+// To switch to PostgreSQL, change provider to "postgresql" and update DATABASE_URL
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ─── ENUMS (SQLite doesn't support native enums, using String fields with validation) ───
+
+// ─── CORE ENTITIES ───
+
+model Official {
+  id                     String   @id @default(cuid())
+  name                   String
+  role                   String   // POLITICIAN | BUREAUCRAT | IAS | IPS | POLICE
+  level                  String   // NATIONAL | STATE | DISTRICT | BLOCK | PANCHAYAT
+  party                  String?
+  department             String?
+  position               String
+  constituency           String?
+  constituencyType       String?  // LOK_SABHA | RAJYA_SABHA | VIDHAN_SABHA | VIDHAN_PARISHAD
+  state                  String
+  district               String?
+  assets                 Float?
+  criminalCases          Int      @default(0)
+  educationQualification String?
+  websiteUrl             String?
+  termStart              String?
+  termEnd                String?
+  profilePhoto           String?
+  gender                 String?
+  age                    Int?
+  email                  String?
+  phone                  String?
+  sourceUrl              String?  // MyNeta/Sansad URL
+
+  // Relations
+  promises               Promise[]
+  allegations            Allegation[]
+  claims                 Claim[]
+  courtCases             CourtCase[]
+  firs                   FIR[]
+  assetDeclarations      AssetDeclaration[]
+  newsArticles           NewsArticleOfficial[]
+  rtiResponses           RTIResponse[]
+  whistleblowerReports   WhistleblowerReportOfficial[]
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([role])
+  @@index([level])
+  @@index([state])
+  @@index([party])
+  @@index([name])
+}
+
+model Promise {
+  id             String   @id @default(cuid())
+  officialId     String
+  official       Official @relation(fields: [officialId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  budgetAllotted Float?
+  budgetSpent    Float?
+  status         String   @default("NOT_STARTED") // NOT_STARTED | IN_PROGRESS | COMPLETED | FAILED
+  proofImages    String?  // JSON array stored as string
+  sourceUrl      String?
+  deadline       String?
+
+  claims         Claim[]  @relation("LinkedPromise")
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([officialId])
+  @@index([status])
+}
+
+model Allegation {
+  id          String   @id @default(cuid())
+  officialId  String
+  official    Official @relation(fields: [officialId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  severity    String   // LOW | MEDIUM | HIGH | CRITICAL
+  status      String   @default("UNVERIFIED") // UNVERIFIED | INVESTIGATING | VERIFIED | DISMISSED
+  proofImages String?  // JSON array
+  sourceUrl   String?
+
+  claims      Claim[]  @relation("LinkedAllegation")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([officialId])
+  @@index([severity])
+  @@index([status])
+}
+
+model Claim {
+  id                  String      @id @default(cuid())
+  officialId          String
+  official            Official    @relation(fields: [officialId], references: [id], onDelete: Cascade)
+  submittedBy         String      @default("Anonymous")
+  type                String      // PROMISE_UPDATE | NEW_PROMISE | ALLEGATION | GENERAL | WHISTLEBLOWER
+  title               String
+  description         String
+  evidence            String?     // JSON array of URLs
+  status              String      @default("PENDING") // PENDING | VERIFIED | REJECTED
+  aiVerificationNote  String?
+  aiConfidence        Int?
+  aiModel             String?     // Which AI model verified this
+
+  linkedPromiseId     String?
+  linkedPromise       Promise?    @relation("LinkedPromise", fields: [linkedPromiseId], references: [id])
+  linkedAllegationId  String?
+  linkedAllegation    Allegation? @relation("LinkedAllegation", fields: [linkedAllegationId], references: [id])
+
+  createdAt           DateTime    @default(now())
+  verifiedAt          DateTime?
+
+  @@index([officialId])
+  @@index([status])
+  @@index([type])
+}
+
+// ─── NEW ENTITIES ───
+
+model CourtCase {
+  id              String   @id @default(cuid())
+  officialId      String
+  official        Official @relation(fields: [officialId], references: [id], onDelete: Cascade)
+  caseNumber      String
+  court           String   // Supreme Court, High Court name, District Court
+  caseType        String   // CRIMINAL | CIVIL | PIL | WRIT | APPEAL
+  status          String   @default("PENDING") // PENDING | HEARING | CONVICTED | ACQUITTED | APPEALED | DISCHARGED
+  charges         String?  // JSON array of IPC sections/charges
+  filingDate      String?
+  lastHearingDate String?
+  nextHearingDate String?
+  judgment        String?
+  judgmentSummary  String?  // AI-generated summary of judgment
+  sourceUrl       String?
+  source          String   @default("MANUAL") // INDIAN_KANOON | ECOURTS | MANUAL | RTI | MYNETA
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([officialId])
+  @@index([status])
+  @@index([court])
+  @@unique([caseNumber, court])
+}
+
+model FIR {
+  id             String   @id @default(cuid())
+  officialId     String
+  official       Official @relation(fields: [officialId], references: [id], onDelete: Cascade)
+  firNumber      String
+  policeStation  String
+  state          String
+  district       String
+  sections       String   // JSON array of IPC sections
+  filingDate     String?
+  status         String   @default("REGISTERED") // REGISTERED | UNDER_INVESTIGATION | CHARGESHEET | CLOSED | ACQUITTED
+  description    String?
+  sourceUrl      String?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([officialId])
+  @@index([state])
+}
+
+model AssetDeclaration {
+  id              String   @id @default(cuid())
+  officialId      String
+  official        Official @relation(fields: [officialId], references: [id], onDelete: Cascade)
+  year            Int
+  electionType    String?  // LOK_SABHA | VIDHAN_SABHA | RAJYA_SABHA
+  movableAssets   Float?
+  immovableAssets Float?
+  totalAssets     Float?
+  liabilities     Float?
+  spouseAssets    Float?
+  sourceUrl       String?  // Link to affidavit PDF on MyNeta/ECI
+
+  createdAt       DateTime @default(now())
+
+  @@index([officialId])
+  @@index([year])
+  @@unique([officialId, year, electionType])
+}
+
+model NewsArticle {
+  id          String   @id @default(cuid())
+  title       String
+  summary     String?
+  url         String   @unique
+  source      String   // NDTV, The Hindu, Times of India, etc.
+  publishedAt DateTime
+  sentiment   String?  // POSITIVE | NEGATIVE | NEUTRAL
+  category    String?  // CORRUPTION | DEVELOPMENT | ELECTION | CRIME | POLICY | CONTROVERSY
+  content     String?  // Full article text (if scraped)
+  aiVerified  Boolean  @default(false)
+
+  officials   NewsArticleOfficial[]
+
+  createdAt   DateTime @default(now())
+
+  @@index([publishedAt])
+  @@index([source])
+  @@index([category])
+}
+
+// Many-to-many: one article can mention multiple officials
+model NewsArticleOfficial {
+  id          String      @id @default(cuid())
+  articleId   String
+  article     NewsArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  officialId  String
+  official    Official    @relation(fields: [officialId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, officialId])
+  @@index([officialId])
+  @@index([articleId])
+}
+
+model RTIResponse {
+  id           String   @id @default(cuid())
+  officialId   String?
+  official     Official? @relation(fields: [officialId], references: [id])
+  department   String
+  question     String
+  response     String?
+  filingDate   String
+  responseDate String?
+  status       String   @default("FILED") // FILED | RESPONDED | FIRST_APPEAL | SECOND_APPEAL | REJECTED
+  documentUrl  String?
+  submittedBy  String   @default("Anonymous")
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([officialId])
+  @@index([department])
+}
+
+model WhistleblowerReport {
+  id                  String   @id @default(cuid())
+  title               String
+  description         String
+  evidence            String?  // JSON array of URLs
+  category            String   // CORRUPTION | BRIBERY | FRAUD | MISUSE_OF_POWER | CRIMINAL | OTHER
+  status              String   @default("SUBMITTED") // SUBMITTED | UNDER_REVIEW | VERIFIED | DISMISSED
+  isAnonymous         Boolean  @default(true)
+  submitterContact    String?  // Encrypted, only if not anonymous
+  aiVerificationNote  String?
+  aiConfidence        Int?
+
+  officials           WhistleblowerReportOfficial[]
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([category])
+  @@index([status])
+}
+
+// Many-to-many: one report can involve multiple officials
+model WhistleblowerReportOfficial {
+  id        String              @id @default(cuid())
+  reportId  String
+  report    WhistleblowerReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  officialId String
+  official  Official            @relation(fields: [officialId], references: [id], onDelete: Cascade)
+
+  @@unique([reportId, officialId])
+  @@index([officialId])
+  @@index([reportId])
+}
+
+// ─── SCRAPING JOB TRACKING ───
+
+model ScrapeJob {
+  id         String   @id @default(cuid())
+  source     String   // MYNETA | SANSAD | INDIAN_KANOON | GNEWS | DATA_GOV
+  status     String   @default("QUEUED") // QUEUED | RUNNING | COMPLETED | FAILED
+  targetId   String?  // officialId if scraping for specific official
+  result     String?  // JSON result summary
+  error      String?
+  startedAt  DateTime?
+  completedAt DateTime?
+
+  createdAt  DateTime @default(now())
+
+  @@index([source])
+  @@index([status])
+}

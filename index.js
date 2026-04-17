@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import http from "http";
 import cors from "cors";
@@ -7,11 +8,12 @@ import { ApolloServer, HeaderMap } from "@apollo/server";
 import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHttpServer";
 import { typeDefs } from "./schema.js";
 import { resolvers } from "./resolvers.js";
-import { PORT } from "./helpers.js";
+import prisma from "./db.js";
 import { startScraperDaemon } from "./scraper.js";
 
-const ALLOWED_CATEGORIES = ["profiles", "promises", "allegations", "claims"];
-const ALLOWED_MIMETYPES = ["image/jpeg", "image/png", "image/webp"];
+const PORT = process.env.PORT || 4000;
+const ALLOWED_CATEGORIES = ["profiles", "promises", "allegations", "claims", "evidence", "documents"];
+const ALLOWED_MIMETYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -68,6 +70,26 @@ app.post("/api/scrape/trigger", express.json(), async (req, res) => {
   }
 });
 
+// Health check
+app.get("/api/health", async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: "ok", db: "connected", timestamp: new Date().toISOString() });
+  } catch (err) {
+    res.status(500).json({ status: "error", db: "disconnected", error: err.message });
+  }
+});
+
+// DB stats endpoint
+app.get("/api/stats", async (req, res) => {
+  const officials = await prisma.official.count();
+  const promises = await prisma.promise.count();
+  const courtCases = await prisma.courtCase.count();
+  const claims = await prisma.claim.count();
+  const news = await prisma.newsArticle.count();
+  res.json({ officials, promises, courtCases, claims, news });
+});
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const category = req.params.category;
@@ -106,11 +128,13 @@ app.post("/upload/:category", upload.single("file"), (req, res) => {
 startScraperDaemon();
 
 httpServer.listen(PORT, () => {
-  console.log(`\n🇮🇳  Neta Watch Backend v2.0`);
+  console.log(`\n🇮🇳  Neta Watch Backend v3.0 (Prisma + SQLite)`);
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-  console.log(`GraphQL:       http://localhost:${PORT}/graphql`);
-  console.log(`File upload:   POST http://localhost:${PORT}/upload/:category`);
-  console.log(`Files served:  http://localhost:${PORT}/uploads/`);
+  console.log(`GraphQL:        http://localhost:${PORT}/graphql`);
+  console.log(`Health check:   http://localhost:${PORT}/api/health`);
+  console.log(`DB stats:       http://localhost:${PORT}/api/stats`);
+  console.log(`File upload:    POST http://localhost:${PORT}/upload/:category`);
+  console.log(`Files served:   http://localhost:${PORT}/uploads/`);
   console.log(`Scrape trigger: POST http://localhost:${PORT}/api/scrape/trigger`);
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 });

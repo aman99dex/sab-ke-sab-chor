@@ -1,281 +1,500 @@
-import db, { newsCache } from "./_db.js";
-import { generateId, now, imageUrl } from "./helpers.js";
-import { verifyClaim as aiVerifyClaim } from "./aiVerifier.js";
-import { scrapeOne } from "./scraper.js";
+// resolvers.js — Neta Watch GraphQL Resolvers (Prisma-backed)
+// Replaces all in-memory array operations with PostgreSQL/SQLite via Prisma
 
-const resolveOfficial = (parent) =>
-  db.officials.find((o) => o.id === parent.officialId);
+import prisma from "./db.js";
+import { verifyClaim } from "./aiVerifier.js";
+
+// Helper: parse JSON string fields (proofImages, evidence, charges, sections)
+const parseJsonArray = (str) => {
+  if (!str) return [];
+  try { return JSON.parse(str); } catch { return []; }
+};
+
+// Helper: build Prisma where clause from optional filters
+const buildWhere = (filters) => {
+  const where = {};
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== null) {
+      where[key] = value;
+    }
+  }
+  return where;
+};
 
 export const resolvers = {
-  Official: {
-    profilePhoto: (parent) => imageUrl("profiles", parent.profilePhoto),
-    promises: (parent) => db.promises.filter((p) => p.officialId === parent.id),
-    allegations: (parent) => db.allegations.filter((a) => a.officialId === parent.id),
-    claims: (parent) => db.claims.filter((c) => c.officialId === parent.id),
-    newsHeadlines: (parent) => newsCache.get(parent.id) || [],
-  },
-
-  Promise: {
-    official: resolveOfficial,
-    proofImages: (parent) => parent.proofImages.map((f) => imageUrl("promises", f)),
-  },
-
-  Allegation: {
-    official: resolveOfficial,
-    proofImages: (parent) => parent.proofImages.map((f) => imageUrl("allegations", f)),
-  },
-
-  Claim: {
-    official: resolveOfficial,
-    evidence: (parent) => parent.evidence.map((f) => imageUrl("claims", f)),
-    linkedPromise: (parent) =>
-      parent.linkedPromiseId
-        ? db.promises.find((p) => p.id === parent.linkedPromiseId)
-        : null,
-    linkedAllegation: (parent) =>
-      parent.linkedAllegationId
-        ? db.allegations.find((a) => a.id === parent.linkedAllegationId)
-        : null,
-  },
-
+  // ─── QUERIES ───
   Query: {
-    officials: (_, { role, state, level, party }) => {
-      let result = db.officials;
-      if (role) result = result.filter((o) => o.role === role);
-      if (state) result = result.filter((o) => o.state === state);
-      if (level) result = result.filter((o) => o.level === level);
-      if (party) result = result.filter((o) => o.party && o.party.toLowerCase().includes(party.toLowerCase()));
-      return result;
-    },
-    official: (_, { id }) => db.officials.find((o) => o.id === id),
-
-    promises: (_, { officialId, status }) => {
-      let result = db.promises;
-      if (officialId) result = result.filter((p) => p.officialId === officialId);
-      if (status) result = result.filter((p) => p.status === status);
-      return result;
-    },
-    promise: (_, { id }) => db.promises.find((p) => p.id === id),
-
-    allegations: (_, { officialId, status }) => {
-      let result = db.allegations;
-      if (officialId) result = result.filter((a) => a.officialId === officialId);
-      if (status) result = result.filter((a) => a.status === status);
-      return result;
-    },
-    allegation: (_, { id }) => db.allegations.find((a) => a.id === id),
-
-    claims: (_, { officialId, status }) => {
-      let result = db.claims;
-      if (officialId) result = result.filter((c) => c.officialId === officialId);
-      if (status) result = result.filter((c) => c.status === status);
-      return result;
-    },
-    claim: (_, { id }) => db.claims.find((c) => c.id === id),
-
-    searchOfficials: (_, { query }) => {
-      const q = query.toLowerCase();
-      return db.officials.filter(
-        (o) =>
-          o.name.toLowerCase().includes(q) ||
-          o.position.toLowerCase().includes(q) ||
-          (o.party && o.party.toLowerCase().includes(q)) ||
-          o.state.toLowerCase().includes(q) ||
-          (o.constituency && o.constituency.toLowerCase().includes(q)) ||
-          (o.district && o.district.toLowerCase().includes(q))
-      );
+    // Officials
+    officials: async (_, { role, state, level, party, limit = 50, offset = 0 }) => {
+      return prisma.official.findMany({
+        where: buildWhere({ role, state, level, party }),
+        take: limit,
+        skip: offset,
+        orderBy: { name: "asc" },
+      });
     },
 
-    statsSummary: () => {
-      const officials = db.officials;
-      const promises = db.promises;
-      const allegations = db.allegations;
-      const claims = db.claims;
-      const states = new Set(officials.map((o) => o.state));
+    official: async (_, { id }) => {
+      return prisma.official.findUnique({ where: { id } });
+    },
+
+    searchOfficials: async (_, { query }) => {
+      return prisma.official.findMany({
+        where: {
+          OR: [
+            { name: { contains: query } },
+            { constituency: { contains: query } },
+            { party: { contains: query } },
+            { state: { contains: query } },
+            { district: { contains: query } },
+            { position: { contains: query } },
+          ],
+        },
+        take: 20,
+      });
+    },
+
+    // Promises
+    promises: async (_, { officialId, status, limit = 50, offset = 0 }) => {
+      return prisma.promise.findMany({
+        where: buildWhere({ officialId, status }),
+        take: limit,
+        skip: offset,
+        orderBy: { createdAt: "desc" },
+      });
+    },
+
+    promise: async (_, { id }) => {
+      return prisma.promise.findUnique({ where: { id } });
+    },
+
+    // Allegations
+    allegations: async (_, { officialId, status, severity, limit = 50, offset = 0 }) => {
+      return prisma.allegation.findMany({
+        where: buildWhere({ officialId, status, severity }),
+        take: limit,
+        skip: offset,
+        orderBy: { createdAt: "desc" },
+      });
+    },
+
+    allegation: async (_, { id }) => {
+      return prisma.allegation.findUnique({ where: { id } });
+    },
+
+    // Claims
+    claims: async (_, { officialId, status, type, limit = 50, offset = 0 }) => {
+      return prisma.claim.findMany({
+        where: buildWhere({ officialId, status, type }),
+        take: limit,
+        skip: offset,
+        orderBy: { createdAt: "desc" },
+      });
+    },
+
+    claim: async (_, { id }) => {
+      return prisma.claim.findUnique({ where: { id } });
+    },
+
+    // Court Cases
+    courtCases: async (_, { officialId, status, court, limit = 50, offset = 0 }) => {
+      return prisma.courtCase.findMany({
+        where: buildWhere({ officialId, status, court }),
+        take: limit,
+        skip: offset,
+        orderBy: { createdAt: "desc" },
+      });
+    },
+
+    courtCase: async (_, { id }) => {
+      return prisma.courtCase.findUnique({ where: { id } });
+    },
+
+    // FIRs
+    firs: async (_, { officialId, state, limit = 50, offset = 0 }) => {
+      return prisma.fIR.findMany({
+        where: buildWhere({ officialId, state }),
+        take: limit,
+        skip: offset,
+        orderBy: { createdAt: "desc" },
+      });
+    },
+
+    fir: async (_, { id }) => {
+      return prisma.fIR.findUnique({ where: { id } });
+    },
+
+    // Asset Declarations
+    assetDeclarations: async (_, { officialId, year }) => {
+      return prisma.assetDeclaration.findMany({
+        where: buildWhere({ officialId, year }),
+        orderBy: { year: "desc" },
+      });
+    },
+
+    // News
+    newsArticles: async (_, { officialId, category, limit = 20, offset = 0 }) => {
+      if (officialId) {
+        const links = await prisma.newsArticleOfficial.findMany({
+          where: { officialId },
+          include: { article: true },
+          take: limit,
+          skip: offset,
+          orderBy: { article: { publishedAt: "desc" } },
+        });
+        return links.map((l) => l.article);
+      }
+      return prisma.newsArticle.findMany({
+        where: buildWhere({ category }),
+        take: limit,
+        skip: offset,
+        orderBy: { publishedAt: "desc" },
+      });
+    },
+
+    // RTI Responses
+    rtiResponses: async (_, { officialId, department, limit = 50, offset = 0 }) => {
+      return prisma.rTIResponse.findMany({
+        where: buildWhere({ officialId, department }),
+        take: limit,
+        skip: offset,
+        orderBy: { createdAt: "desc" },
+      });
+    },
+
+    // Whistleblower Reports
+    whistleblowerReports: async (_, { status, category, limit = 50, offset = 0 }) => {
+      return prisma.whistleblowerReport.findMany({
+        where: buildWhere({ status, category }),
+        take: limit,
+        skip: offset,
+        orderBy: { createdAt: "desc" },
+      });
+    },
+
+    // Scrape Jobs
+    scrapeJobs: async (_, { source, status, limit = 20 }) => {
+      return prisma.scrapeJob.findMany({
+        where: buildWhere({ source, status }),
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      });
+    },
+
+    // Stats Summary
+    statsSummary: async () => {
+      const [
+        totalOfficials, totalPoliticians, totalBureaucrats,
+        totalPromises, completedPromises, pendingPromises,
+        totalAllegations, highSeverityAllegations,
+        totalClaims, pendingClaims, verifiedClaims,
+        totalCourtCases, totalFIRs, totalNewsArticles,
+        statesRaw,
+      ] = await Promise.all([
+        prisma.official.count(),
+        prisma.official.count({ where: { role: "POLITICIAN" } }),
+        prisma.official.count({ where: { role: { in: ["BUREAUCRAT", "IAS", "IPS"] } } }),
+        prisma.promise.count(),
+        prisma.promise.count({ where: { status: "COMPLETED" } }),
+        prisma.promise.count({ where: { status: { in: ["NOT_STARTED", "IN_PROGRESS"] } } }),
+        prisma.allegation.count(),
+        prisma.allegation.count({ where: { severity: { in: ["HIGH", "CRITICAL"] } } }),
+        prisma.claim.count(),
+        prisma.claim.count({ where: { status: "PENDING" } }),
+        prisma.claim.count({ where: { status: "VERIFIED" } }),
+        prisma.courtCase.count(),
+        prisma.fIR.count(),
+        prisma.newsArticle.count(),
+        prisma.official.findMany({ select: { state: true }, distinct: ["state"] }),
+      ]);
 
       return {
-        totalOfficials: officials.length,
-        totalPoliticians: officials.filter((o) => o.role === "POLITICIAN").length,
-        totalBureaucrats: officials.filter((o) => o.role === "BUREAUCRAT").length,
-        totalPromises: promises.length,
-        completedPromises: promises.filter((p) => p.status === "COMPLETED").length,
-        pendingPromises: promises.filter((p) => p.status !== "COMPLETED" && p.status !== "FAILED").length,
-        totalAllegations: allegations.length,
-        highSeverityAllegations: allegations.filter((a) => a.severity === "HIGH").length,
-        totalClaims: claims.length,
-        pendingClaims: claims.filter((c) => c.status === "PENDING").length,
-        verifiedClaims: claims.filter((c) => c.status === "VERIFIED").length,
-        statesTracked: states.size,
+        totalOfficials, totalPoliticians, totalBureaucrats,
+        totalPromises, completedPromises, pendingPromises,
+        totalAllegations, highSeverityAllegations,
+        totalClaims, pendingClaims, verifiedClaims,
+        totalCourtCases, totalFIRs, totalNewsArticles,
+        statesTracked: statesRaw.length,
       };
     },
-
-    newsHeadlines: (_, { officialId }) => newsCache.get(officialId) || [],
   },
 
+  // ─── MUTATIONS ───
   Mutation: {
-    addOfficial: (_, { input }) => {
-      const official = {
-        ...input,
-        id: generateId(),
-        profilePhoto: null,
-        createdAt: now(),
-      };
-      db.officials.push(official);
-      return official;
-    },
-    updateOfficial: (_, { id, input }) => {
-      const idx = db.officials.findIndex((o) => o.id === id);
-      if (idx === -1) return null;
-      db.officials[idx] = { ...db.officials[idx], ...input };
-      return db.officials[idx];
-    },
-    deleteOfficial: (_, { id }) => {
-      const len = db.officials.length;
-      db.officials = db.officials.filter((o) => o.id !== id);
-      return db.officials.length < len;
+    // Officials
+    addOfficial: async (_, { input }) => {
+      return prisma.official.create({ data: input });
     },
 
-    addPromise: (_, { input }) => {
-      const timestamp = now();
-      const promise = {
-        ...input,
-        id: generateId(),
-        budgetSpent: 0,
-        status: input.status || "NOT_STARTED",
-        proofImages: [],
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      };
-      db.promises.push(promise);
-      return promise;
-    },
-    updatePromise: (_, { id, input }) => {
-      const idx = db.promises.findIndex((p) => p.id === id);
-      if (idx === -1) return null;
-      db.promises[idx] = { ...db.promises[idx], ...input, updatedAt: now() };
-      return db.promises[idx];
-    },
-    deletePromise: (_, { id }) => {
-      const len = db.promises.length;
-      db.promises = db.promises.filter((p) => p.id !== id);
-      return db.promises.length < len;
-    },
-
-    addAllegation: (_, { input }) => {
-      const timestamp = now();
-      const allegation = {
-        ...input,
-        id: generateId(),
-        status: "UNVERIFIED",
-        proofImages: [],
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      };
-      db.allegations.push(allegation);
-      return allegation;
-    },
-    updateAllegation: (_, { id, input }) => {
-      const idx = db.allegations.findIndex((a) => a.id === id);
-      if (idx === -1) return null;
-      db.allegations[idx] = { ...db.allegations[idx], ...input, updatedAt: now() };
-      return db.allegations[idx];
-    },
-    deleteAllegation: (_, { id }) => {
-      const len = db.allegations.length;
-      db.allegations = db.allegations.filter((a) => a.id !== id);
-      return db.allegations.length < len;
-    },
-
-    submitClaim: async (_, { input }) => {
-      const claim = {
-        ...input,
-        id: generateId(),
-        evidence: [],
-        status: "PENDING",
-        aiVerificationNote: null,
-        aiConfidence: null,
-        linkedPromiseId: input.linkedPromiseId || null,
-        linkedAllegationId: input.linkedAllegationId || null,
-        createdAt: now(),
-        verifiedAt: null,
-      };
-      db.claims.push(claim);
-
-      // Fire-and-forget AI verification in background
-      const official = db.officials.find((o) => o.id === input.officialId);
-      if (official) {
-        (async () => {
-          try {
-            const result = await aiVerifyClaim(input.title, input.description, official.name);
-            const idx = db.claims.findIndex((c) => c.id === claim.id);
-            if (idx !== -1) {
-              db.claims[idx].aiVerificationNote = result.note;
-              db.claims[idx].aiConfidence = result.confidence;
-              if (result.claimStatus === "VERIFIED") {
-                db.claims[idx].status = "VERIFIED";
-                db.claims[idx].verifiedAt = now();
-              }
-              console.log(`[AI Verifier] Claim ${claim.id}: ${result.label} (${result.confidence}% confidence)`);
-            }
-          } catch (err) {
-            console.warn("[AI Verifier] Background verification failed:", err.message);
-          }
-        })();
+    updateOfficial: async (_, { id, input }) => {
+      // Remove undefined/null fields
+      const data = {};
+      for (const [key, value] of Object.entries(input)) {
+        if (value !== undefined) data[key] = value;
       }
+      return prisma.official.update({ where: { id }, data });
+    },
 
-      return claim;
+    deleteOfficial: async (_, { id }) => {
+      await prisma.official.delete({ where: { id } });
+      return true;
+    },
+
+    // Promises
+    addPromise: async (_, { input }) => {
+      return prisma.promise.create({ data: input });
+    },
+
+    updatePromise: async (_, { id, input }) => {
+      const data = {};
+      for (const [key, value] of Object.entries(input)) {
+        if (value !== undefined) data[key] = value;
+      }
+      return prisma.promise.update({ where: { id }, data });
+    },
+
+    deletePromise: async (_, { id }) => {
+      await prisma.promise.delete({ where: { id } });
+      return true;
+    },
+
+    // Allegations
+    addAllegation: async (_, { input }) => {
+      return prisma.allegation.create({ data: input });
+    },
+
+    updateAllegation: async (_, { id, input }) => {
+      const data = {};
+      for (const [key, value] of Object.entries(input)) {
+        if (value !== undefined) data[key] = value;
+      }
+      return prisma.allegation.update({ where: { id }, data });
+    },
+
+    deleteAllegation: async (_, { id }) => {
+      await prisma.allegation.delete({ where: { id } });
+      return true;
+    },
+
+    // Claims (anonymous submission)
+    submitClaim: async (_, { input }) => {
+      return prisma.claim.create({
+        data: {
+          officialId: input.officialId,
+          submittedBy: input.submittedBy || "Anonymous",
+          type: input.type,
+          title: input.title,
+          description: input.description,
+          linkedPromiseId: input.linkedPromiseId || null,
+          linkedAllegationId: input.linkedAllegationId || null,
+        },
+      });
     },
 
     verifyClaim: async (_, { id, input }) => {
-      const idx = db.claims.findIndex((c) => c.id === id);
-      if (idx === -1) return null;
+      return prisma.claim.update({
+        where: { id },
+        data: {
+          status: input.status,
+          aiVerificationNote: input.aiVerificationNote,
+          aiConfidence: input.aiConfidence,
+          aiModel: input.aiModel || null,
+          verifiedAt: new Date(),
+        },
+      });
+    },
 
-      // If no note provided, run AI verification
-      let note = input.aiVerificationNote;
-      let confidence = input.aiConfidence ?? null;
+    deleteClaim: async (_, { id }) => {
+      await prisma.claim.delete({ where: { id } });
+      return true;
+    },
 
-      if (!note || note === "auto") {
-        const claim = db.claims[idx];
-        const official = db.officials.find((o) => o.id === claim.officialId);
-        if (official) {
-          try {
-            const result = await aiVerifyClaim(claim.title, claim.description, official.name);
-            note = result.note;
-            confidence = result.confidence;
-          } catch (err) {
-            note = "AI verification failed — manual review required.";
-          }
-        }
+    // Court Cases
+    addCourtCase: async (_, { input }) => {
+      return prisma.courtCase.create({
+        data: {
+          officialId: input.officialId,
+          caseNumber: input.caseNumber,
+          court: input.court,
+          caseType: input.caseType,
+          status: input.status || "PENDING",
+          charges: input.charges ? JSON.stringify(input.charges) : null,
+          filingDate: input.filingDate || null,
+          sourceUrl: input.sourceUrl || null,
+          source: input.source || "MANUAL",
+        },
+      });
+    },
+
+    updateCourtCase: async (_, { id, input }) => {
+      const data = {};
+      for (const [key, value] of Object.entries(input)) {
+        if (value !== undefined) data[key] = value;
       }
-
-      db.claims[idx] = {
-        ...db.claims[idx],
-        status: input.status,
-        aiVerificationNote: note,
-        aiConfidence: confidence,
-        verifiedAt: now(),
-      };
-      return db.claims[idx];
+      return prisma.courtCase.update({ where: { id }, data });
     },
 
-    deleteClaim: (_, { id }) => {
-      const len = db.claims.length;
-      db.claims = db.claims.filter((c) => c.id !== id);
-      return db.claims.length < len;
+    // FIRs
+    addFIR: async (_, { input }) => {
+      return prisma.fIR.create({
+        data: {
+          ...input,
+          sections: JSON.stringify(input.sections),
+          status: input.status || "REGISTERED",
+        },
+      });
     },
 
-    triggerScrape: async (_, { officialId }) => {
-      try {
-        if (officialId) {
-          return await scrapeOne(officialId);
-        }
-        const { scrapeAll } = await import("./scraper.js");
-        scrapeAll().catch(console.error); // fire-and-forget
-        return true;
-      } catch (err) {
-        console.error("[Scraper] Manual trigger failed:", err.message);
-        return false;
+    // Asset Declarations
+    addAssetDeclaration: async (_, { input }) => {
+      return prisma.assetDeclaration.create({ data: input });
+    },
+
+    // Whistleblower Reports (anonymous)
+    submitWhistleblowerReport: async (_, { input }) => {
+      const report = await prisma.whistleblowerReport.create({
+        data: {
+          title: input.title,
+          description: input.description,
+          category: input.category,
+          isAnonymous: input.isAnonymous !== false,
+        },
+      });
+      // Link officials
+      if (input.officialIds?.length > 0) {
+        await prisma.whistleblowerReportOfficial.createMany({
+          data: input.officialIds.map((officialId) => ({
+            reportId: report.id,
+            officialId,
+          })),
+        });
       }
+      return report;
     },
+
+    // RTI Responses (crowdsourced)
+    submitRTIResponse: async (_, { input }) => {
+      return prisma.rTIResponse.create({
+        data: {
+          officialId: input.officialId || null,
+          department: input.department,
+          question: input.question,
+          response: input.response || null,
+          filingDate: input.filingDate,
+          responseDate: input.responseDate || null,
+          status: input.status || "FILED",
+          documentUrl: input.documentUrl || null,
+          submittedBy: input.submittedBy || "Anonymous",
+        },
+      });
+    },
+
+    // Scraping trigger
+    triggerScrape: async (_, { source, officialId }) => {
+      return prisma.scrapeJob.create({
+        data: {
+          source,
+          targetId: officialId || null,
+          status: "QUEUED",
+        },
+      });
+    },
+  },
+
+  // ─── FIELD RESOLVERS ───
+  Official: {
+    promises: (parent) => prisma.promise.findMany({ where: { officialId: parent.id } }),
+    allegations: (parent) => prisma.allegation.findMany({ where: { officialId: parent.id } }),
+    claims: (parent) => prisma.claim.findMany({ where: { officialId: parent.id } }),
+    courtCases: (parent) => prisma.courtCase.findMany({ where: { officialId: parent.id } }),
+    firs: (parent) => prisma.fIR.findMany({ where: { officialId: parent.id } }),
+    assetDeclarations: (parent) => prisma.assetDeclaration.findMany({ where: { officialId: parent.id }, orderBy: { year: "desc" } }),
+    newsArticles: async (parent) => {
+      const links = await prisma.newsArticleOfficial.findMany({
+        where: { officialId: parent.id },
+        include: { article: true },
+        take: 10,
+        orderBy: { article: { publishedAt: "desc" } },
+      });
+      return links.map((l) => l.article);
+    },
+    rtiResponses: (parent) => prisma.rTIResponse.findMany({ where: { officialId: parent.id } }),
+    createdAt: (parent) => parent.createdAt instanceof Date ? parent.createdAt.toISOString() : parent.createdAt,
+    updatedAt: (parent) => parent.updatedAt instanceof Date ? parent.updatedAt.toISOString() : parent.updatedAt,
+  },
+
+  Promise: {
+    official: (parent) => prisma.official.findUnique({ where: { id: parent.officialId } }),
+    proofImages: (parent) => parseJsonArray(parent.proofImages),
+    createdAt: (parent) => parent.createdAt instanceof Date ? parent.createdAt.toISOString() : parent.createdAt,
+    updatedAt: (parent) => parent.updatedAt instanceof Date ? parent.updatedAt.toISOString() : parent.updatedAt,
+  },
+
+  Allegation: {
+    official: (parent) => prisma.official.findUnique({ where: { id: parent.officialId } }),
+    proofImages: (parent) => parseJsonArray(parent.proofImages),
+    createdAt: (parent) => parent.createdAt instanceof Date ? parent.createdAt.toISOString() : parent.createdAt,
+    updatedAt: (parent) => parent.updatedAt instanceof Date ? parent.updatedAt.toISOString() : parent.updatedAt,
+  },
+
+  Claim: {
+    official: (parent) => prisma.official.findUnique({ where: { id: parent.officialId } }),
+    evidence: (parent) => parseJsonArray(parent.evidence),
+    linkedPromise: (parent) => parent.linkedPromiseId ? prisma.promise.findUnique({ where: { id: parent.linkedPromiseId } }) : null,
+    linkedAllegation: (parent) => parent.linkedAllegationId ? prisma.allegation.findUnique({ where: { id: parent.linkedAllegationId } }) : null,
+    createdAt: (parent) => parent.createdAt instanceof Date ? parent.createdAt.toISOString() : parent.createdAt,
+    verifiedAt: (parent) => parent.verifiedAt instanceof Date ? parent.verifiedAt.toISOString() : parent.verifiedAt,
+  },
+
+  CourtCase: {
+    official: (parent) => prisma.official.findUnique({ where: { id: parent.officialId } }),
+    charges: (parent) => parseJsonArray(parent.charges),
+    createdAt: (parent) => parent.createdAt instanceof Date ? parent.createdAt.toISOString() : parent.createdAt,
+    updatedAt: (parent) => parent.updatedAt instanceof Date ? parent.updatedAt.toISOString() : parent.updatedAt,
+  },
+
+  FIR: {
+    official: (parent) => prisma.official.findUnique({ where: { id: parent.officialId } }),
+    sections: (parent) => parseJsonArray(parent.sections),
+    createdAt: (parent) => parent.createdAt instanceof Date ? parent.createdAt.toISOString() : parent.createdAt,
+  },
+
+  AssetDeclaration: {
+    official: (parent) => prisma.official.findUnique({ where: { id: parent.officialId } }),
+    createdAt: (parent) => parent.createdAt instanceof Date ? parent.createdAt.toISOString() : parent.createdAt,
+  },
+
+  NewsArticle: {
+    officials: async (parent) => {
+      const links = await prisma.newsArticleOfficial.findMany({
+        where: { articleId: parent.id },
+        include: { official: true },
+      });
+      return links.map((l) => l.official);
+    },
+    publishedAt: (parent) => parent.publishedAt instanceof Date ? parent.publishedAt.toISOString() : parent.publishedAt,
+  },
+
+  RTIResponse: {
+    official: (parent) => parent.officialId ? prisma.official.findUnique({ where: { id: parent.officialId } }) : null,
+    createdAt: (parent) => parent.createdAt instanceof Date ? parent.createdAt.toISOString() : parent.createdAt,
+  },
+
+  WhistleblowerReport: {
+    officials: async (parent) => {
+      const links = await prisma.whistleblowerReportOfficial.findMany({
+        where: { reportId: parent.id },
+        include: { official: true },
+      });
+      return links.map((l) => l.official);
+    },
+    evidence: (parent) => parseJsonArray(parent.evidence),
+    createdAt: (parent) => parent.createdAt instanceof Date ? parent.createdAt.toISOString() : parent.createdAt,
+  },
+
+  ScrapeJob: {
+    createdAt: (parent) => parent.createdAt instanceof Date ? parent.createdAt.toISOString() : parent.createdAt,
+    startedAt: (parent) => parent.startedAt instanceof Date ? parent.startedAt.toISOString() : parent.startedAt,
+    completedAt: (parent) => parent.completedAt instanceof Date ? parent.completedAt.toISOString() : parent.completedAt,
   },
 };

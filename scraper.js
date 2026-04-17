@@ -1,8 +1,8 @@
 // scraper.js — Google News RSS scraper for Neta Watch
 // Fetches live news headlines for each tracked official
-// Runs as a background daemon every 30 minutes
+// Now stores results in database via Prisma
 
-import db, { newsCache } from "./_db.js";
+import prisma from "./db.js";
 
 const SCRAPE_INTERVAL_MS = 30 * 60 * 1000; // 30 min
 
@@ -28,7 +28,7 @@ async function fetchNewsForOfficial(official) {
 
     const res = await fetch(url, {
       headers: {
-        "User-Agent": "NetaWatch/2.0 (open-source political accountability; contact: netawatch@example.com)",
+        "User-Agent": "NetaWatch/3.0 (open-source political accountability; contact: netawatch@example.com)",
         "Accept": "application/rss+xml, application/xml, text/xml",
       },
       signal: controller.signal,
@@ -48,14 +48,11 @@ async function fetchNewsForOfficial(official) {
     while ((match = itemRegex.exec(xml)) !== null && headlines.length < 5) {
       const chunk = match[1];
 
-      // Title — handle CDATA
       const titleMatch =
         chunk.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/) ||
         chunk.match(/<title>([\s\S]*?)<\/title>/);
 
-      // Link — after the first <link> in item
       const linkMatch = chunk.match(/<link>\s*(https?:\/\/[^\s<]+)\s*<\/link>/);
-
       const dateMatch = chunk.match(/<pubDate>([\s\S]*?)<\/pubDate>/);
       const sourceMatch =
         chunk.match(/<source[^>]*><!\[CDATA\[([\s\S]*?)\]\]><\/source>/) ||
@@ -81,7 +78,9 @@ async function fetchNewsForOfficial(official) {
 }
 
 export async function scrapeAll() {
-  const officials = db.officials;
+  const officials = await prisma.official.findMany({
+    select: { id: true, name: true, level: true },
+  });
   let successCount = 0;
 
   console.log(`[Scraper] Scraping news for ${officials.length} officials...`);
@@ -89,12 +88,43 @@ export async function scrapeAll() {
   for (const official of officials) {
     const headlines = await fetchNewsForOfficial(official);
     if (headlines.length > 0) {
-      // Merge with existing cache (keep old if scrape returns nothing)
-      const existing = newsCache.get(official.id) || [];
-      newsCache.set(official.id, headlines);
+      for (const h of headlines) {
+        try {
+          // Upsert: avoid duplicate articles by URL
+          const article = await prisma.newsArticle.upsert({
+            where: { url: h.url },
+            update: {},
+            create: {
+              title: h.title,
+              url: h.url,
+              source: h.source,
+              publishedAt: new Date(h.publishedAt),
+            },
+          });
+          // Link article to official (skip if already linked)
+          await prisma.newsArticleOfficial.upsert({
+            where: {
+              articleId_officialId: {
+                articleId: article.id,
+                officialId: official.id,
+              },
+            },
+            update: {},
+            create: {
+              articleId: article.id,
+              officialId: official.id,
+            },
+          });
+        } catch (err) {
+          // Ignore unique constraint violations
+          if (!err.message?.includes("Unique constraint")) {
+            console.warn(`[Scraper] DB error: ${err.message}`);
+          }
+        }
+      }
       successCount++;
     }
-    // Throttle: 2.5s between requests to avoid rate limiting
+    // Throttle: 2.5s between requests
     await new Promise((r) => setTimeout(r, 2500));
   }
 
@@ -102,17 +132,46 @@ export async function scrapeAll() {
 }
 
 export async function scrapeOne(officialId) {
-  const official = db.officials.find((o) => o.id === officialId);
+  const official = await prisma.official.findUnique({
+    where: { id: officialId },
+    select: { id: true, name: true, level: true },
+  });
   if (!official) return false;
+
   const headlines = await fetchNewsForOfficial(official);
-  if (headlines.length > 0) {
-    newsCache.set(officialId, headlines);
+  for (const h of headlines) {
+    try {
+      const article = await prisma.newsArticle.upsert({
+        where: { url: h.url },
+        update: {},
+        create: {
+          title: h.title,
+          url: h.url,
+          source: h.source,
+          publishedAt: new Date(h.publishedAt),
+        },
+      });
+      await prisma.newsArticleOfficial.upsert({
+        where: {
+          articleId_officialId: {
+            articleId: article.id,
+            officialId: official.id,
+          },
+        },
+        update: {},
+        create: { articleId: article.id, officialId: official.id },
+      });
+    } catch (err) {
+      if (!err.message?.includes("Unique constraint")) {
+        console.warn(`[Scraper] DB error: ${err.message}`);
+      }
+    }
   }
   return true;
 }
 
 export function startScraperDaemon() {
-  // First run after 10s startup delay (let server settle)
+  // First run after 10s startup delay
   setTimeout(() => scrapeAll().catch(console.error), 10000);
   setInterval(() => scrapeAll().catch(console.error), SCRAPE_INTERVAL_MS);
   console.log(`[Scraper] Daemon started — runs every ${SCRAPE_INTERVAL_MS / 60000}min.`);
