@@ -1,10 +1,97 @@
-// aiVerifier.js — AI claim verification using HuggingFace Inference API (free tier)
-// Model: facebook/bart-large-mnli (zero-shot classification)
-// No API key required for ~1k requests/day. Set HF_TOKEN env var for higher limits.
+// aiVerifier.js — Tiered AI claim verification (ALL FREE)
+// Tier 1: Groq Llama 3 (1,000 req/day free) — primary verifier
+// Tier 2: HuggingFace BART-MNLI (1,000 req/day free) — fallback classifier
+// Tier 3: Keyword-based offline analysis — last resort
 
-const HF_API_URL =
-  "https://api-inference.huggingface.co/models/facebook/bart-large-mnli";
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_API_KEY = process.env.GROQ_API_KEY || null;
+const GROQ_MODEL = "llama-3.3-70b-versatile"; // Free tier
+
+const HF_API_URL = "https://api-inference.huggingface.co/models/facebook/bart-large-mnli";
 const HF_TOKEN = process.env.HF_TOKEN || null;
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || null;
+
+// ─── TIER 1: Groq Llama 3 Verification ───
+
+async function verifyWithGroq(claimTitle, claimDescription, officialName) {
+  if (!GROQ_API_KEY) return null;
+
+  const systemPrompt = `You are an AI fact-checker for Indian political claims. Analyze the claim and respond ONLY with valid JSON:
+{
+  "verdict": "VERIFIED" | "LIKELY_FALSE" | "UNVERIFIABLE",
+  "confidence": 0-100,
+  "reasoning": "brief explanation",
+  "suggestedSources": ["list of sources to check"]
+}
+
+Rules:
+- Be skeptical. Default to UNVERIFIABLE if insufficient evidence.
+- VERIFIED = strong evidence supports the claim
+- LIKELY_FALSE = contradicting evidence or known misinformation patterns
+- UNVERIFIABLE = cannot determine truth without official records
+- Consider Indian legal/political context`;
+
+  const userPrompt = `Claim about ${officialName}: "${claimTitle}"
+Description: ${claimDescription}
+
+Analyze this claim about an Indian government official.`;
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+
+    const res = await fetch(GROQ_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.1,
+        max_tokens: 500,
+        response_format: { type: "json_object" },
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      console.warn(`[AI-Groq] API error ${res.status}: ${errText}`);
+      return null;
+    }
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) return null;
+
+    const parsed = JSON.parse(content);
+    const verdictMap = { VERIFIED: "VERIFIED", LIKELY_FALSE: "REJECTED", UNVERIFIABLE: "PENDING" };
+
+    return {
+      label: parsed.verdict || "UNVERIFIABLE",
+      claimStatus: verdictMap[parsed.verdict] || "PENDING",
+      confidence: parsed.confidence || 50,
+      note: `🤖 Groq Llama 3 (${parsed.confidence}% confidence): ${parsed.reasoning || "Analysis complete."}${parsed.suggestedSources?.length ? ` Sources to check: ${parsed.suggestedSources.join(", ")}` : ""}`,
+      model: "groq/llama-3.3-70b",
+    };
+  } catch (err) {
+    if (err.name === "AbortError") {
+      console.warn("[AI-Groq] Request timed out.");
+    } else {
+      console.warn(`[AI-Groq] Error: ${err.message}`);
+    }
+    return null;
+  }
+}
+
+// ─── TIER 2: HuggingFace BART-MNLI Classification ───
 
 const CANDIDATE_LABELS = [
   "factually verified with evidence",
@@ -12,7 +99,7 @@ const CANDIDATE_LABELS = [
   "unverifiable without official records",
 ];
 
-export async function verifyClaim(claimTitle, claimDescription, officialName) {
+async function verifyWithHuggingFace(claimTitle, claimDescription, officialName) {
   const inputText = `Claim about ${officialName}: ${claimTitle}. ${claimDescription}`;
 
   try {
@@ -29,8 +116,7 @@ export async function verifyClaim(claimTitle, claimDescription, officialName) {
         inputs: inputText,
         parameters: {
           candidate_labels: CANDIDATE_LABELS,
-          hypothesis_template:
-            "This claim about an Indian government official is {}.",
+          hypothesis_template: "This claim about an Indian government official is {}.",
           multi_label: false,
         },
       }),
@@ -38,24 +124,10 @@ export async function verifyClaim(claimTitle, claimDescription, officialName) {
     });
     clearTimeout(timeout);
 
-    if (!response.ok) {
-      const errText = await response.text().catch(() => "");
-      console.warn("[AI Verifier] API error:", response.status, errText);
-      return fallbackVerification(claimTitle, claimDescription);
-    }
+    if (!response.ok) return null;
 
     const result = await response.json();
-
-    // Model may still be loading
-    if (result.error) {
-      console.warn("[AI Verifier] Model loading:", result.error);
-      return {
-        label: "UNVERIFIABLE",
-        claimStatus: "PENDING",
-        confidence: 0,
-        note: "AI model is warming up. Claim queued for manual review. Please retry in ~30 seconds.",
-      };
-    }
+    if (result.error) return null;
 
     const topIdx = result.scores.indexOf(Math.max(...result.scores));
     const topLabel = result.labels[topIdx];
@@ -78,24 +150,18 @@ export async function verifyClaim(claimTitle, claimDescription, officialName) {
       label: labelMap[topLabel] || "UNVERIFIABLE",
       claimStatus: statusMap[topLabel] || "PENDING",
       confidence: pct(topScore),
-      note: `🤖 AI Analysis (${pct(topScore)}% confidence): This claim appears "${topLabel}". ` +
-        `[Verified: ${pct(result.scores[0])}% | False: ${pct(result.scores[1])}% | Unverifiable: ${pct(result.scores[2])}%] ` +
-        `Model: facebook/bart-large-mnli via HuggingFace Inference API.`,
+      note: `🤖 HuggingFace BART (${pct(topScore)}% confidence): "${topLabel}". [V:${pct(result.scores[0])}% | F:${pct(result.scores[1])}% | U:${pct(result.scores[2])}%]`,
+      model: "huggingface/bart-large-mnli",
     };
   } catch (err) {
-    if (err.name === "AbortError") {
-      console.warn("[AI Verifier] Request timed out.");
-      return {
-        label: "UNVERIFIABLE",
-        claimStatus: "PENDING",
-        confidence: 0,
-        note: "AI verification timed out. Claim queued for manual review.",
-      };
+    if (err.name !== "AbortError") {
+      console.warn(`[AI-HF] Error: ${err.message}`);
     }
-    console.warn("[AI Verifier] Error:", err.message);
-    return fallbackVerification(claimTitle, claimDescription);
+    return null;
   }
 }
+
+// ─── TIER 3: Keyword-Based Offline Fallback ───
 
 function fallbackVerification(title, description) {
   const text = (title + " " + description).toLowerCase();
@@ -103,10 +169,11 @@ function fallbackVerification(title, description) {
   const verifiedKeywords = [
     "proof", "document", "rti", "official record", "court", "judgment",
     "affidavit", "gazette", "confirmed", "audit report", "cbi", "ed",
+    "chargesheet", "fir", "evidence", "investigation",
   ];
   const falseKeywords = [
     "rumor", "i heard", "somebody said", "allegedly", "unconfirmed",
-    "hearsay", "whatsapp forward", "social media claim",
+    "hearsay", "whatsapp forward", "social media claim", "fake",
   ];
 
   const vScore = verifiedKeywords.filter((k) => text.includes(k)).length;
@@ -118,6 +185,7 @@ function fallbackVerification(title, description) {
       claimStatus: "VERIFIED",
       confidence: 52,
       note: "Claim contains verifiable evidence indicators (offline analysis). Manual review recommended.",
+      model: "offline/keyword-analysis",
     };
   }
   if (fScore > vScore) {
@@ -126,12 +194,72 @@ function fallbackVerification(title, description) {
       claimStatus: "REJECTED",
       confidence: 45,
       note: "Claim contains uncertainty indicators (offline analysis). Manual review recommended.",
+      model: "offline/keyword-analysis",
     };
   }
   return {
     label: "UNVERIFIABLE",
     claimStatus: "PENDING",
     confidence: 25,
-    note: "AI verification temporarily unavailable. Claim queued for manual review.",
+    note: "AI verification unavailable. Claim queued for manual review.",
+    model: "offline/keyword-analysis",
   };
+}
+
+// ─── MAIN: Tiered Verification ───
+
+export async function verifyClaim(claimTitle, claimDescription, officialName) {
+  // Try Tier 1: Groq Llama 3
+  const groqResult = await verifyWithGroq(claimTitle, claimDescription, officialName);
+  if (groqResult) {
+    console.log(`[AI] Verified via Groq Llama 3 (${groqResult.confidence}% confidence)`);
+    return groqResult;
+  }
+
+  // Try Tier 2: HuggingFace BART
+  const hfResult = await verifyWithHuggingFace(claimTitle, claimDescription, officialName);
+  if (hfResult) {
+    console.log(`[AI] Verified via HuggingFace BART (${hfResult.confidence}% confidence)`);
+    return hfResult;
+  }
+
+  // Tier 3: Offline fallback
+  console.log("[AI] All API models unavailable, using offline keyword analysis.");
+  return fallbackVerification(claimTitle, claimDescription);
+}
+
+// ─── BONUS: Gemini Flash Data Extraction (for scraper use) ───
+
+export async function extractWithGemini(htmlContent, extractionPrompt) {
+  if (!GEMINI_API_KEY) return null;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `${extractionPrompt}\n\nHTML Content:\n${htmlContent.substring(0, 30000)}`,
+            }],
+          }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 2000,
+            responseMimeType: "application/json",
+          },
+        }),
+      }
+    );
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    return text ? JSON.parse(text) : null;
+  } catch (err) {
+    console.warn(`[AI-Gemini] Error: ${err.message}`);
+    return null;
+  }
 }
