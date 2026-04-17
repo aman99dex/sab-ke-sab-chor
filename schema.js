@@ -1,68 +1,201 @@
 export const typeDefs = `#graphql
-  type Game {
-    id: ID!
-    title: String!
-    platform: [String!]!
-    reviews: [Review!]
+  enum Role {
+    POLITICIAN
+    BUREAUCRAT
   }
-  type Review {
-    id: ID!
-    rating: Int!
-    content: String!
-    author: Author!
-    game: Game!
+
+  enum PromiseStatus {
+    NOT_STARTED
+    IN_PROGRESS
+    COMPLETED
+    FAILED
   }
-  type Author {
+
+  enum AllegationSeverity {
+    LOW
+    MEDIUM
+    HIGH
+  }
+
+  enum AllegationStatus {
+    UNVERIFIED
+    INVESTIGATING
+    VERIFIED
+    DISMISSED
+  }
+
+  enum ClaimType {
+    PROMISE_UPDATE
+    NEW_PROMISE
+    ALLEGATION
+    GENERAL
+  }
+
+  enum ClaimStatus {
+    PENDING
+    VERIFIED
+    REJECTED
+  }
+
+  type Official {
     id: ID!
     name: String!
-    verified: Boolean!
-    reviews: [Review!]
+    role: Role!
+    party: String
+    department: String
+    position: String!
+    state: String!
+    district: String
+    profilePhoto: String
+    promises: [Promise!]
+    allegations: [Allegation!]
+    claims: [Claim!]
+    createdAt: String!
   }
+
+  type Promise {
+    id: ID!
+    official: Official!
+    title: String!
+    description: String
+    budgetAllotted: Float
+    budgetSpent: Float
+    status: PromiseStatus!
+    proofImages: [String!]
+    sourceUrl: String
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  type Allegation {
+    id: ID!
+    official: Official!
+    title: String!
+    description: String
+    severity: AllegationSeverity!
+    status: AllegationStatus!
+    proofImages: [String!]
+    sourceUrl: String
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  type Claim {
+    id: ID!
+    official: Official!
+    submittedBy: String!
+    type: ClaimType!
+    title: String!
+    description: String!
+    evidence: [String!]
+    status: ClaimStatus!
+    aiVerificationNote: String
+    linkedPromise: Promise
+    linkedAllegation: Allegation
+    createdAt: String!
+    verifiedAt: String
+  }
+
   type Query {
-    games: [Game]
-    game(id: ID!): Game
-    reviews: [Review]
-    review(id: ID!): Review
-    authors: [Author]
-    author(id: ID!): Author
+    officials(role: Role, state: String): [Official!]
+    official(id: ID!): Official
+
+    promises(officialId: ID, status: PromiseStatus): [Promise!]
+    promise(id: ID!): Promise
+
+    allegations(officialId: ID, status: AllegationStatus): [Allegation!]
+    allegation(id: ID!): Allegation
+
+    claims(officialId: ID, status: ClaimStatus): [Claim!]
+    claim(id: ID!): Claim
+
+    searchOfficials(query: String!): [Official!]
   }
+
   type Mutation {
-    addGame(game: AddGameInput!): Game
-    deleteGame(id: ID!): [Game]
-    updateGame(id: ID!, edits: EditGameInput!): Game
+    addOfficial(input: AddOfficialInput!): Official!
+    updateOfficial(id: ID!, input: UpdateOfficialInput!): Official!
+    deleteOfficial(id: ID!): Boolean!
 
-    addAuthor(author: AddAuthorInput!): Author
-    deleteAuthor(id: ID!): [Author]
-    updateAuthor(id: ID!, edits: EditAuthorInput!): Author
+    addPromise(input: AddPromiseInput!): Promise!
+    updatePromise(id: ID!, input: UpdatePromiseInput!): Promise!
+    deletePromise(id: ID!): Boolean!
 
-    addReview(review: AddReviewInput!): Review
-    deleteReview(id: ID!): [Review]
-    updateReview(id: ID!, edits: EditReviewInput!): Review
+    addAllegation(input: AddAllegationInput!): Allegation!
+    updateAllegation(id: ID!, input: UpdateAllegationInput!): Allegation!
+    deleteAllegation(id: ID!): Boolean!
+
+    submitClaim(input: SubmitClaimInput!): Claim!
+    verifyClaim(id: ID!, input: VerifyClaimInput!): Claim!
+    deleteClaim(id: ID!): Boolean!
   }
-  input AddGameInput {
-    title: String!
-    platform: [String!]!
-  }
-  input EditGameInput {
-    title: String
-    platform: [String!]
-  }
-  input AddAuthorInput {
+
+  input AddOfficialInput {
     name: String!
-    verified: Boolean!
+    role: Role!
+    party: String
+    department: String
+    position: String!
+    state: String!
+    district: String
   }
-  input EditAuthorInput {
+
+  input UpdateOfficialInput {
     name: String
-    verified: Boolean
+    party: String
+    department: String
+    position: String
+    state: String
+    district: String
+    profilePhoto: String
   }
-  input AddReviewInput {
-    rating: Int!
-    content: String!
-    author_id: ID!
-    game_id: ID!
+
+  input AddPromiseInput {
+    officialId: ID!
+    title: String!
+    description: String
+    budgetAllotted: Float
+    status: PromiseStatus
+    sourceUrl: String
   }
-  input EditReviewInput {
-    rating: Int
-    content: String
+
+  input UpdatePromiseInput {
+    title: String
+    description: String
+    budgetAllotted: Float
+    budgetSpent: Float
+    status: PromiseStatus
+    sourceUrl: String
   }
-`
+
+  input AddAllegationInput {
+    officialId: ID!
+    title: String!
+    description: String
+    severity: AllegationSeverity!
+    sourceUrl: String
+  }
+
+  input UpdateAllegationInput {
+    title: String
+    description: String
+    severity: AllegationSeverity
+    status: AllegationStatus
+    sourceUrl: String
+  }
+
+  input SubmitClaimInput {
+    officialId: ID!
+    submittedBy: String!
+    type: ClaimType!
+    title: String!
+    description: String!
+    linkedPromiseId: ID
+    linkedAllegationId: ID
+  }
+
+  input VerifyClaimInput {
+    status: ClaimStatus!
+    aiVerificationNote: String!
+  }
+`;

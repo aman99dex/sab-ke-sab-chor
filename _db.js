@@ -1,25 +1,127 @@
-let games = [
-  {id: '1', title: 'Zelda, Tears of the Kingdom', platform: ['Switch']},
-  {id: '2', title: 'Final Fantasy 7 Remake', platform: ['PS5', 'Xbox']},
-  {id: '3', title: 'Elden Ring', platform: ['PS5', 'Xbox', 'PC']},
-  {id: '4', title: 'Mario Kart', platform: ['Switch']},
-  {id: '5', title: 'Pokemon Scarlet', platform: ['PS5', 'Xbox', 'PC']},
-]
+let officials = [
+  {
+    id: "1",
+    name: "Rajesh Kumar Sharma",
+    role: "POLITICIAN",
+    party: "Bharatiya Janata Party",
+    department: "Ministry of Road Transport and Highways",
+    position: "Minister of State",
+    state: "Rajasthan",
+    district: "Jaipur",
+    profilePhoto: null,
+    createdAt: "2026-04-17T10:00:00.000Z",
+  },
+  {
+    id: "2",
+    name: "Priya Deshmukh",
+    role: "POLITICIAN",
+    party: "Indian National Congress",
+    department: "Ministry of Education",
+    position: "Member of Parliament",
+    state: "Maharashtra",
+    district: "Pune",
+    profilePhoto: null,
+    createdAt: "2026-04-17T10:00:00.000Z",
+  },
+  {
+    id: "3",
+    name: "Vikram Singh Chauhan",
+    role: "BUREAUCRAT",
+    party: null,
+    department: "Municipal Corporation",
+    position: "District Collector",
+    state: "Uttar Pradesh",
+    district: "Lucknow",
+    profilePhoto: null,
+    createdAt: "2026-04-17T10:00:00.000Z",
+  },
+];
 
-let authors = [
-  {id: '1', name: 'mario', verified: true},
-  {id: '2', name: 'yoshi', verified: false},
-  {id: '3', name: 'peach', verified: true},
-]
+let promises = [
+  {
+    id: "1",
+    officialId: "1",
+    title: "Build 500km national highway connecting Jaipur to Udaipur",
+    description: "Promised during 2024 election campaign to complete a 4-lane highway by 2027.",
+    budgetAllotted: 12000000000,
+    budgetSpent: 3500000000,
+    status: "IN_PROGRESS",
+    proofImages: [],
+    sourceUrl: null,
+    createdAt: "2026-04-17T10:00:00.000Z",
+    updatedAt: "2026-04-17T10:00:00.000Z",
+  },
+  {
+    id: "2",
+    officialId: "2",
+    title: "Open 50 new government schools in rural Maharashtra",
+    description: "Committed to building schools in underserved areas by 2026.",
+    budgetAllotted: 500000000,
+    budgetSpent: 0,
+    status: "NOT_STARTED",
+    proofImages: [],
+    sourceUrl: null,
+    createdAt: "2026-04-17T10:00:00.000Z",
+    updatedAt: "2026-04-17T10:00:00.000Z",
+  },
+  {
+    id: "3",
+    officialId: "3",
+    title: "Fix drainage system in old Lucknow",
+    description: "Approved plan to overhaul the sewage and drainage infrastructure in the old city area.",
+    budgetAllotted: 800000000,
+    budgetSpent: 200000000,
+    status: "IN_PROGRESS",
+    proofImages: [],
+    sourceUrl: null,
+    createdAt: "2026-04-17T10:00:00.000Z",
+    updatedAt: "2026-04-17T10:00:00.000Z",
+  },
+];
 
-let reviews = [
-  {id: '1', rating: 9, content: 'lorem ipsum', author_id: '1', game_id: '2'},
-  {id: '2', rating: 10, content: 'lorem ipsum', author_id: '2', game_id: '1'},
-  {id: '3', rating: 7, content: 'lorem ipsum', author_id: '3', game_id: '3'},
-  {id: '4', rating: 5, content: 'lorem ipsum', author_id: '2', game_id: '4'},
-  {id: '5', rating: 8, content: 'lorem ipsum', author_id: '2', game_id: '5'},
-  {id: '6', rating: 7, content: 'lorem ipsum', author_id: '1', game_id: '2'},
-  {id: '7', rating: 10, content: 'lorem ipsum', author_id: '3', game_id: '1'},
-]
+let allegations = [
+  {
+    id: "1",
+    officialId: "1",
+    title: "Inflated highway construction costs",
+    description: "Reports suggest the per-km cost is 40% higher than comparable projects, with contracts awarded to a single firm without competitive bidding.",
+    severity: "HIGH",
+    status: "INVESTIGATING",
+    proofImages: [],
+    sourceUrl: null,
+    createdAt: "2026-04-17T10:00:00.000Z",
+    updatedAt: "2026-04-17T10:00:00.000Z",
+  },
+  {
+    id: "2",
+    officialId: "3",
+    title: "Ghost workers on drainage project payroll",
+    description: "Whistleblower claims 30% of listed workers do not exist and their wages are being siphoned.",
+    severity: "MEDIUM",
+    status: "UNVERIFIED",
+    proofImages: [],
+    sourceUrl: null,
+    createdAt: "2026-04-17T10:00:00.000Z",
+    updatedAt: "2026-04-17T10:00:00.000Z",
+  },
+];
 
-export default { games, authors, reviews }
+let claims = [
+  {
+    id: "1",
+    officialId: "2",
+    submittedBy: "anonymous_citizen",
+    type: "PROMISE_UPDATE",
+    title: "No construction started on promised schools",
+    description: "I live in Satara district. No land has been acquired and no construction has begun for the promised schools. It has been 2 years since the announcement.",
+    evidence: [],
+    status: "PENDING",
+    aiVerificationNote: null,
+    linkedPromiseId: "2",
+    linkedAllegationId: null,
+    createdAt: "2026-04-17T12:00:00.000Z",
+    verifiedAt: null,
+  },
+];
+
+export default { officials, promises, allegations, claims };

@@ -1,82 +1,95 @@
-import { ApolloServer } from "@apollo/server";
-import { startStandaloneServer } from "@apollo/server/standalone";
+import express from "express";
+import http from "http";
+import cors from "cors";
+import multer from "multer";
+import path from "path";
+import { ApolloServer, HeaderMap } from "@apollo/server";
+import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHttpServer";
 import { typeDefs } from "./schema.js";
-import db from "./_db.js";
+import { resolvers } from "./resolvers.js";
+import { PORT } from "./helpers.js";
 
-const resolvers = {
-  Query: {
-    games: () => db.games,
-    game: (_, args) => db.games.find((g) => g.id === args.id),
-    reviews: () => db.reviews,
-    review: (_, args) => db.reviews.find((r) => r.id === args.id),
-    authors: () => db.authors,
-    author: (_, args) => db.authors.find((a) => a.id === args.id),
-  },
-  Game: {
-    reviews: (parent) => db.reviews.filter((r) => r.game_id === parent.id),
-  },
-  Author: {
-    reviews: (parent) => db.reviews.filter((r) => r.author_id === parent.id),
-  },
-  Review: {
-    game: (parent) => db.games.find((g) => g.id === parent.game_id),
-    author: (parent) => db.authors.find((a) => a.id === parent.author_id),
-  },
-  Mutation: {
-    addGame: (_, args) => {
-      const game = { ...args.game, id: String(db.games.length + 1) };
-      db.games.push(game);
-      return game;
-    },
-    deleteGame: (_, args) => {
-      db.games = db.games.filter((g) => g.id !== args.id);
-      return db.games;
-    },
-    updateGame: (_, args) => {
-      db.games = db.games.map((g) =>
-        g.id === args.id ? { ...g, ...args.edits } : g
-      );
-      return db.games.find((g) => g.id === args.id);
-    },
+const ALLOWED_CATEGORIES = ["profiles", "promises", "allegations", "claims"];
+const ALLOWED_MIMETYPES = ["image/jpeg", "image/png", "image/webp"];
 
-    addAuthor: (_, args) => {
-      const author = { ...args.author, id: String(db.authors.length + 1) };
-      db.authors.push(author);
-      return author;
-    },
-    deleteAuthor: (_, args) => {
-      db.authors = db.authors.filter((a) => a.id !== args.id);
-      return db.authors;
-    },
-    updateAuthor: (_, args) => {
-      db.authors = db.authors.map((a) =>
-        a.id === args.id ? { ...a, ...args.edits } : a
-      );
-      return db.authors.find((a) => a.id === args.id);
-    },
+const app = express();
+const httpServer = http.createServer(app);
+app.use(cors());
 
-    addReview: (_, args) => {
-      const review = { ...args.review, id: String(db.reviews.length + 1) };
-      db.reviews.push(review);
-      return review;
-    },
-    deleteReview: (_, args) => {
-      db.reviews = db.reviews.filter((r) => r.id !== args.id);
-      return db.reviews;
-    },
-    updateReview: (_, args) => {
-      db.reviews = db.reviews.map((r) =>
-        r.id === args.id ? { ...r, ...args.edits } : r
-      );
-      return db.reviews.find((r) => r.id === args.id);
-    },
-  },
-};
+const server = new ApolloServer({
+  typeDefs,
+  resolvers,
+  plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
+});
+await server.start();
 
-const server = new ApolloServer({ typeDefs, resolvers });
+app.use("/graphql", express.json(), async (req, res) => {
+  const headers = new HeaderMap();
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (value) headers.set(key, Array.isArray(value) ? value.join(", ") : value);
+  }
 
-const { url } = await startStandaloneServer(server, {
-  listen: { port: 4000 },
+  const httpGraphQLResponse = await server.executeHTTPGraphQLRequest({
+    httpGraphQLRequest: {
+      method: req.method,
+      headers,
+      body: req.body,
+      search: new URL(req.url, `http://${req.headers.host}`).search ?? "",
+    },
+    context: async () => ({}),
+  });
+
+  for (const [key, value] of httpGraphQLResponse.headers) {
+    res.setHeader(key, value);
+  }
+  res.status(httpGraphQLResponse.status || 200);
+
+  if (httpGraphQLResponse.body.kind === "complete") {
+    res.send(httpGraphQLResponse.body.string);
+  } else {
+    for await (const chunk of httpGraphQLResponse.body.asyncIterator) {
+      res.write(chunk);
+    }
+    res.end();
+  }
 });
 
-console.log(`Server ready at: ${url}`);
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const category = req.params.category;
+    if (!ALLOWED_CATEGORIES.includes(category)) {
+      return cb(new Error("Invalid upload category"));
+    }
+    cb(null, `uploads/${category}`);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${req.params.category}_${Date.now()}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    cb(null, ALLOWED_MIMETYPES.includes(file.mimetype));
+  },
+});
+
+app.use("/uploads", express.static("uploads"));
+
+app.post("/upload/:category", upload.single("file"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded" });
+  }
+  res.json({
+    filename: req.file.filename,
+    url: `http://localhost:${PORT}/uploads/${req.params.category}/${req.file.filename}`,
+  });
+});
+
+httpServer.listen(PORT, () => {
+  console.log(`GraphQL:     http://localhost:${PORT}/graphql`);
+  console.log(`File upload: POST http://localhost:${PORT}/upload/:category`);
+  console.log(`Files:       http://localhost:${PORT}/uploads/`);
+});
