@@ -8,6 +8,7 @@ import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHt
 import { typeDefs } from "./schema.js";
 import { resolvers } from "./resolvers.js";
 import { PORT } from "./helpers.js";
+import { startScraperDaemon } from "./scraper.js";
 
 const ALLOWED_CATEGORIES = ["profiles", "promises", "allegations", "claims"];
 const ALLOWED_MIMETYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -54,6 +55,19 @@ app.use("/graphql", express.json(), async (req, res) => {
   }
 });
 
+// Manual scrape trigger (dev/admin use)
+app.post("/api/scrape/trigger", express.json(), async (req, res) => {
+  const { officialId } = req.body || {};
+  const { scrapeOne, scrapeAll } = await import("./scraper.js");
+  if (officialId) {
+    const ok = await scrapeOne(officialId);
+    res.json({ ok, officialId });
+  } else {
+    scrapeAll().catch(console.error);
+    res.json({ ok: true, message: "Full scrape started in background." });
+  }
+});
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const category = req.params.category;
@@ -88,8 +102,15 @@ app.post("/upload/:category", upload.single("file"), (req, res) => {
   });
 });
 
+// Start the scraper daemon
+startScraperDaemon();
+
 httpServer.listen(PORT, () => {
-  console.log(`GraphQL:     http://localhost:${PORT}/graphql`);
-  console.log(`File upload: POST http://localhost:${PORT}/upload/:category`);
-  console.log(`Files:       http://localhost:${PORT}/uploads/`);
+  console.log(`\n🇮🇳  Neta Watch Backend v2.0`);
+  console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+  console.log(`GraphQL:       http://localhost:${PORT}/graphql`);
+  console.log(`File upload:   POST http://localhost:${PORT}/upload/:category`);
+  console.log(`Files served:  http://localhost:${PORT}/uploads/`);
+  console.log(`Scrape trigger: POST http://localhost:${PORT}/api/scrape/trigger`);
+  console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 });

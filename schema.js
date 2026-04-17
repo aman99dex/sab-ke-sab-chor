@@ -4,6 +4,14 @@ export const typeDefs = `#graphql
     BUREAUCRAT
   }
 
+  enum PoliticalLevel {
+    NATIONAL
+    STATE
+    DISTRICT
+    BLOCK
+    PANCHAYAT
+  }
+
   enum PromiseStatus {
     NOT_STARTED
     IN_PROGRESS
@@ -37,19 +45,51 @@ export const typeDefs = `#graphql
     REJECTED
   }
 
+  type NewsHeadline {
+    title: String!
+    url: String!
+    source: String!
+    publishedAt: String!
+  }
+
+  type StatsSummary {
+    totalOfficials: Int!
+    totalPoliticians: Int!
+    totalBureaucrats: Int!
+    totalPromises: Int!
+    completedPromises: Int!
+    pendingPromises: Int!
+    totalAllegations: Int!
+    highSeverityAllegations: Int!
+    totalClaims: Int!
+    pendingClaims: Int!
+    verifiedClaims: Int!
+    statesTracked: Int!
+  }
+
   type Official {
     id: ID!
     name: String!
     role: Role!
+    level: PoliticalLevel!
     party: String
     department: String
     position: String!
+    constituency: String
+    constituencyType: String
     state: String!
     district: String
+    assets: Float
+    criminalCases: Int
+    educationQualification: String
+    websiteUrl: String
+    termStart: String
+    termEnd: String
     profilePhoto: String
     promises: [Promise!]
     allegations: [Allegation!]
     claims: [Claim!]
+    newsHeadlines: [NewsHeadline!]
     createdAt: String!
   }
 
@@ -63,6 +103,7 @@ export const typeDefs = `#graphql
     status: PromiseStatus!
     proofImages: [String!]
     sourceUrl: String
+    deadline: String
     createdAt: String!
     updatedAt: String!
   }
@@ -90,6 +131,7 @@ export const typeDefs = `#graphql
     evidence: [String!]
     status: ClaimStatus!
     aiVerificationNote: String
+    aiConfidence: Int
     linkedPromise: Promise
     linkedAllegation: Allegation
     createdAt: String!
@@ -97,7 +139,7 @@ export const typeDefs = `#graphql
   }
 
   type Query {
-    officials(role: Role, state: String): [Official!]
+    officials(role: Role, state: String, level: PoliticalLevel, party: String): [Official!]
     official(id: ID!): Official
 
     promises(officialId: ID, status: PromiseStatus): [Promise!]
@@ -110,6 +152,8 @@ export const typeDefs = `#graphql
     claim(id: ID!): Claim
 
     searchOfficials(query: String!): [Official!]
+    statsSummary: StatsSummary!
+    newsHeadlines(officialId: ID!): [NewsHeadline!]
   }
 
   type Mutation {
@@ -128,16 +172,27 @@ export const typeDefs = `#graphql
     submitClaim(input: SubmitClaimInput!): Claim!
     verifyClaim(id: ID!, input: VerifyClaimInput!): Claim!
     deleteClaim(id: ID!): Boolean!
+
+    triggerScrape(officialId: ID): Boolean!
   }
 
   input AddOfficialInput {
     name: String!
     role: Role!
+    level: PoliticalLevel!
     party: String
     department: String
     position: String!
+    constituency: String
+    constituencyType: String
     state: String!
     district: String
+    assets: Float
+    criminalCases: Int
+    educationQualification: String
+    websiteUrl: String
+    termStart: String
+    termEnd: String
   }
 
   input UpdateOfficialInput {
@@ -145,9 +200,17 @@ export const typeDefs = `#graphql
     party: String
     department: String
     position: String
+    constituency: String
+    constituencyType: String
     state: String
     district: String
     profilePhoto: String
+    assets: Float
+    criminalCases: Int
+    educationQualification: String
+    websiteUrl: String
+    termStart: String
+    termEnd: String
   }
 
   input AddPromiseInput {
@@ -157,6 +220,7 @@ export const typeDefs = `#graphql
     budgetAllotted: Float
     status: PromiseStatus
     sourceUrl: String
+    deadline: String
   }
 
   input UpdatePromiseInput {
@@ -166,6 +230,7 @@ export const typeDefs = `#graphql
     budgetSpent: Float
     status: PromiseStatus
     sourceUrl: String
+    deadline: String
   }
 
   input AddAllegationInput {
@@ -197,5 +262,6 @@ export const typeDefs = `#graphql
   input VerifyClaimInput {
     status: ClaimStatus!
     aiVerificationNote: String!
+    aiConfidence: Int
   }
 `;
