@@ -1,17 +1,13 @@
 // db.js — Prisma client singleton for Neta Watch
-// Uses libsql adapter for SQLite (local dev)
-// Switch to @prisma/adapter-pg for PostgreSQL in production
+// Uses better-sqlite3 adapter for local SQLite dev
 
+import "dotenv/config";
 import { PrismaClient } from "./generated/prisma/client.ts";
-import { PrismaLibSql } from "@prisma/adapter-libsql";
-import { createClient } from "@libsql/client";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 
-// Create libsql client pointing to local SQLite file
-const libsql = createClient({
-  url: "file:./prisma/dev.db",
+const adapter = new PrismaBetterSqlite3({
+  url: process.env.DATABASE_URL || "file:./prisma/dev.db",
 });
-
-const adapter = new PrismaLibSql(libsql);
 
 const prisma = new PrismaClient({
   adapter,
