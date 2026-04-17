@@ -38,6 +38,38 @@ const resolvers = {
       );
       return db.games.find((g) => g.id === args.id);
     },
+
+    addAuthor: (_, args) => {
+      const author = { ...args.author, id: String(db.authors.length + 1) };
+      db.authors.push(author);
+      return author;
+    },
+    deleteAuthor: (_, args) => {
+      db.authors = db.authors.filter((a) => a.id !== args.id);
+      return db.authors;
+    },
+    updateAuthor: (_, args) => {
+      db.authors = db.authors.map((a) =>
+        a.id === args.id ? { ...a, ...args.edits } : a
+      );
+      return db.authors.find((a) => a.id === args.id);
+    },
+
+    addReview: (_, args) => {
+      const review = { ...args.review, id: String(db.reviews.length + 1) };
+      db.reviews.push(review);
+      return review;
+    },
+    deleteReview: (_, args) => {
+      db.reviews = db.reviews.filter((r) => r.id !== args.id);
+      return db.reviews;
+    },
+    updateReview: (_, args) => {
+      db.reviews = db.reviews.map((r) =>
+        r.id === args.id ? { ...r, ...args.edits } : r
+      );
+      return db.reviews.find((r) => r.id === args.id);
+    },
   },
 };
 
