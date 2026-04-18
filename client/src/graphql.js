@@ -1,7 +1,7 @@
 import { gql } from "@apollo/client";
 
 export const GET_OFFICIALS = gql`
-  query GetOfficials($role: Role, $state: String, $level: PoliticalLevel, $party: String) {
+  query GetOfficials($role: String, $state: String, $level: String, $party: String) {
     officials(role: $role, state: $state, level: $level, party: $party) {
       id
       name
@@ -75,7 +75,7 @@ export const GET_OFFICIAL = gql`
         createdAt
         verifiedAt
       }
-      newsHeadlines {
+      newsArticles {
         title
         url
         source
@@ -146,13 +146,19 @@ export const VERIFY_CLAIM = gql`
 `;
 
 export const TRIGGER_SCRAPE = gql`
-  mutation TriggerScrape($officialId: ID) {
-    triggerScrape(officialId: $officialId)
+  mutation TriggerScrape($source: String!, $officialId: ID) {
+    triggerScrape(source: $source, officialId: $officialId) {
+      id
+      source
+      status
+      targetId
+      createdAt
+    }
   }
 `;
 
 export const GET_CLAIMS = gql`
-  query GetClaims($status: ClaimStatus) {
+  query GetClaims($status: String) {
     claims(status: $status) {
       id
       title

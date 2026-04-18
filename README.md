@@ -10,6 +10,9 @@ An open accountability platform for tracking Indian politicians and bureaucrats 
 - Citizens can **submit claims** (broken promises, corruption reports) which get verified
 - **AI verification** pipeline (placeholder — plug in Claude API later to auto-verify claims)
 - **Image uploads** for profile photos, proof of work, proof of corruption
+- **Three.js intro landing** with interactive 3D India map
+- **Global person intelligence search** (Google CSE if configured + public-source fallback)
+- **AI task runner API** for verification/research/scraping strategy workflows
 
 ## Tech Stack
 
@@ -100,6 +103,37 @@ curl -F "file=@photo.jpg" http://localhost:4000/upload/profiles
 
 # Categories: profiles, promises, allegations, claims
 ```
+
+### New REST Endpoints
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/people/search?q=<query>&limit=8` | GET | Global people search from Google CSE/Wikipedia/DuckDuckGo |
+| `/api/people/profile?name=<person>` | GET | Person profile summary + linked sources |
+| `/api/images/proxy?url=<encoded-image-url>` | GET | Server-side image proxy + in-memory cache for external images |
+| `/api/images/cache/stats` | GET | Image proxy cache telemetry |
+| `/api/agents/run` | POST | Run AI task (`VERIFY_CLAIM`, `GLOBAL_PERSON_RESEARCH`, `SCRAPE_STRATEGY`) |
+| `/api/agents/scrape-jobs` | POST | Queue scraping jobs (`FULL_NEWS_SCRAPE`, `OFFICIAL_NEWS_SCRAPE`) |
+| `/api/agents/scrape-jobs` | GET | List recent scrape jobs + queue stats |
+| `/api/agents/scrape-jobs/:id` | GET | Scrape job progress details/logs |
+| `/api/agents/scrape-queue/stats` | GET | Queue-level runtime stats |
+| `/api/cache/stats` | GET | Inspect server-side in-memory cache stats |
+
+Example AI task payload:
+
+```json
+{
+  "taskType": "GLOBAL_PERSON_RESEARCH",
+  "payload": {
+    "name": "Example Official"
+  }
+}
+```
+
+### Optional Environment Variables
+
+- `GOOGLE_API_KEY` + `GOOGLE_CSE_ID` for Google-powered global people search
+- `GROQ_API_KEY` for richer AI agent task briefs
 
 ## Roadmap
 

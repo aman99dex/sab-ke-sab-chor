@@ -12,6 +12,8 @@ import prisma from "./db.js";
 import { startScraperDaemon } from "./scraper.js";
 import { runAgentTask } from "./agentTasks.js";
 import { getExternalIntelCacheStats, getPersonProfile, searchPeopleGlobal } from "./externalIntel.js";
+import { getImageProxyCacheStats, getProxyImage } from "./imageProxyCache.js";
+import { enqueueScrapeJob, getScrapeJob, getScrapeQueueStats, listScrapeJobs } from "./scrapeQueue.js";
 
 const PORT = process.env.PORT || 4000;
 const ALLOWED_CATEGORIES = ["profiles", "promises", "allegations", "claims", "evidence", "documents"];
@@ -20,6 +22,17 @@ const ALLOWED_MIMETYPES = ["image/jpeg", "image/png", "image/webp", "application
 const app = express();
 const httpServer = http.createServer(app);
 app.use(cors());
+
+httpServer.on("error", (error) => {
+  if (error?.code === "EADDRINUSE") {
+    console.error(`\n[Startup Error] Port ${PORT} is already in use.`);
+    console.error("Stop the running server process or change PORT in your environment.");
+    process.exit(1);
+  }
+
+  console.error("\n[Startup Error] Failed to start backend:", error);
+  process.exit(1);
+});
 
 const server = new ApolloServer({
   typeDefs,
@@ -64,8 +77,8 @@ app.post("/api/scrape/trigger", express.json(), async (req, res) => {
   const { officialId } = req.body || {};
   const { scrapeOne, scrapeAll } = await import("./scraper.js");
   if (officialId) {
-    const ok = await scrapeOne(officialId);
-    res.json({ ok, officialId });
+    const result = await scrapeOne(officialId);
+    res.json({ ok: !!result?.ok, officialId, result });
   } else {
     scrapeAll().catch(console.error);
     res.json({ ok: true, message: "Full scrape started in background." });
@@ -152,6 +165,66 @@ app.get("/api/cache/stats", (req, res) => {
   res.json(getExternalIntelCacheStats());
 });
 
+app.get("/api/images/proxy", async (req, res) => {
+  const url = String(req.query.url || "").trim();
+  const refresh = String(req.query.refresh || "") === "1";
+
+  if (!url) {
+    return res.status(400).json({ error: "url query param is required" });
+  }
+
+  const result = await getProxyImage(url, { refresh });
+  if (!result.ok) {
+    return res.status(result.statusCode || 500).json({ error: result.error || "Image proxy failed" });
+  }
+
+  res.setHeader("Content-Type", result.contentType);
+  res.setHeader("Content-Length", String(result.contentLength));
+  res.setHeader("Cache-Control", "public, max-age=900");
+  res.setHeader("X-Image-Proxy-Cache", result.fromCache ? "HIT" : "MISS");
+  return res.send(result.buffer);
+});
+
+app.get("/api/images/cache/stats", (req, res) => {
+  res.json(getImageProxyCacheStats());
+});
+
+app.post("/api/agents/scrape-jobs", express.json(), (req, res) => {
+  const { type, officialId } = req.body || {};
+  const normalizedType = String(type || "FULL_NEWS_SCRAPE").toUpperCase();
+
+  if (!["FULL_NEWS_SCRAPE", "OFFICIAL_NEWS_SCRAPE"].includes(normalizedType)) {
+    return res.status(400).json({
+      error: "Invalid scrape job type. Use FULL_NEWS_SCRAPE or OFFICIAL_NEWS_SCRAPE",
+    });
+  }
+
+  if (normalizedType === "OFFICIAL_NEWS_SCRAPE" && !String(officialId || "").trim()) {
+    return res.status(400).json({ error: "officialId is required for OFFICIAL_NEWS_SCRAPE" });
+  }
+
+  const job = enqueueScrapeJob({ type: normalizedType, officialId });
+  res.status(202).json(job);
+});
+
+app.get("/api/agents/scrape-jobs", (req, res) => {
+  const limit = Number(req.query.limit) || 20;
+  const jobs = listScrapeJobs(limit);
+  res.json({ jobs, stats: getScrapeQueueStats() });
+});
+
+app.get("/api/agents/scrape-jobs/:id", (req, res) => {
+  const job = getScrapeJob(req.params.id);
+  if (!job) {
+    return res.status(404).json({ error: "Scrape job not found" });
+  }
+  return res.json(job);
+});
+
+app.get("/api/agents/scrape-queue/stats", (req, res) => {
+  res.json(getScrapeQueueStats());
+});
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const category = req.params.category;
@@ -197,6 +270,8 @@ httpServer.listen(PORT, () => {
   console.log(`DB stats:       http://localhost:${PORT}/api/stats`);
   console.log(`People search:  http://localhost:${PORT}/api/people/search?q=name`);
   console.log(`Agent tasks:    POST http://localhost:${PORT}/api/agents/run`);
+  console.log(`Image proxy:    http://localhost:${PORT}/api/images/proxy?url=<encoded>`);
+  console.log(`Scrape queue:   POST http://localhost:${PORT}/api/agents/scrape-jobs`);
   console.log(`File upload:    POST http://localhost:${PORT}/upload/:category`);
   console.log(`Files served:   http://localhost:${PORT}/uploads/`);
   console.log(`Scrape trigger: POST http://localhost:${PORT}/api/scrape/trigger`);

@@ -1,5 +1,6 @@
 import { verifyClaim } from "./aiVerifier.js";
 import { getPersonProfile, searchPeopleGlobal } from "./externalIntel.js";
+import { enqueueScrapeJob } from "./scrapeQueue.js";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -108,10 +109,23 @@ export async function runAgentTask(taskType, payload = {}) {
     };
   }
 
+  if (normalizedTask === "QUEUE_SCRAPE_JOB") {
+    const officialId = payload.officialId ? String(payload.officialId).trim() : null;
+    const type = officialId ? "OFFICIAL_NEWS_SCRAPE" : "FULL_NEWS_SCRAPE";
+    const queuedJob = enqueueScrapeJob({ type, officialId });
+
+    return {
+      taskType: normalizedTask,
+      status: "ok",
+      result: queuedJob,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   return {
     taskType: normalizedTask,
     status: "error",
     error: `Unsupported taskType: ${normalizedTask}`,
-    supportedTaskTypes: ["VERIFY_CLAIM", "GLOBAL_PERSON_RESEARCH", "SCRAPE_STRATEGY"],
+    supportedTaskTypes: ["VERIFY_CLAIM", "GLOBAL_PERSON_RESEARCH", "SCRAPE_STRATEGY", "QUEUE_SCRAPE_JOB"],
   };
 }

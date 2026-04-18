@@ -77,7 +77,8 @@ async function fetchNewsForOfficial(official) {
   }
 }
 
-export async function scrapeAll() {
+export async function scrapeAll(options = {}) {
+  const { onProgress } = options;
   const officials = await prisma.official.findMany({
     select: { id: true, name: true, level: true },
   });
@@ -85,8 +86,11 @@ export async function scrapeAll() {
 
   console.log(`[Scraper] Scraping news for ${officials.length} officials...`);
 
-  for (const official of officials) {
+  for (let index = 0; index < officials.length; index += 1) {
+    const official = officials[index];
     const headlines = await fetchNewsForOfficial(official);
+    const updated = headlines.length > 0;
+
     if (headlines.length > 0) {
       for (const h of headlines) {
         try {
@@ -124,21 +128,70 @@ export async function scrapeAll() {
       }
       successCount++;
     }
+
+    if (typeof onProgress === "function") {
+      onProgress({
+        current: index + 1,
+        total: officials.length,
+        officialId: official.id,
+        officialName: official.name,
+        headlinesCount: headlines.length,
+        updated,
+        successCount,
+      });
+    }
+
     // Throttle: 2.5s between requests
     await new Promise((r) => setTimeout(r, 2500));
   }
 
   console.log(`[Scraper] Done — ${successCount}/${officials.length} officials updated.`);
+  return {
+    totalOfficials: officials.length,
+    updatedOfficials: successCount,
+  };
 }
 
-export async function scrapeOne(officialId) {
+export async function scrapeOne(officialId, options = {}) {
+  const { onProgress } = options;
+
   const official = await prisma.official.findUnique({
     where: { id: officialId },
     select: { id: true, name: true, level: true },
   });
-  if (!official) return false;
+  if (!official) {
+    return {
+      ok: false,
+      officialId,
+      reason: "OFFICIAL_NOT_FOUND",
+      headlinesCount: 0,
+    };
+  }
+
+  if (typeof onProgress === "function") {
+    onProgress({
+      current: 0,
+      total: 1,
+      officialId: official.id,
+      officialName: official.name,
+      headlinesCount: 0,
+      updated: false,
+    });
+  }
 
   const headlines = await fetchNewsForOfficial(official);
+
+  if (typeof onProgress === "function") {
+    onProgress({
+      current: 1,
+      total: 1,
+      officialId: official.id,
+      officialName: official.name,
+      headlinesCount: headlines.length,
+      updated: headlines.length > 0,
+    });
+  }
+
   for (const h of headlines) {
     try {
       const article = await prisma.newsArticle.upsert({
@@ -167,7 +220,14 @@ export async function scrapeOne(officialId) {
       }
     }
   }
-  return true;
+
+  return {
+    ok: true,
+    officialId: official.id,
+    officialName: official.name,
+    headlinesCount: headlines.length,
+    updated: headlines.length > 0,
+  };
 }
 
 export function startScraperDaemon() {

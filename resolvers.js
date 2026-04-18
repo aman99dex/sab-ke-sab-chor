@@ -2,7 +2,7 @@
 // Replaces all in-memory array operations with PostgreSQL/SQLite via Prisma
 
 import prisma from "./db.js";
-import { verifyClaim } from "./aiVerifier.js";
+import { scrapeAll, scrapeOne } from "./scraper.js";
 
 // Helper: parse JSON string fields (proofImages, evidence, charges, sections)
 const parseJsonArray = (str) => {
@@ -391,13 +391,55 @@ export const resolvers = {
 
     // Scraping trigger
     triggerScrape: async (_, { source, officialId }) => {
-      return prisma.scrapeJob.create({
+      const job = await prisma.scrapeJob.create({
         data: {
           source,
           targetId: officialId || null,
           status: "QUEUED",
         },
       });
+
+      (async () => {
+        try {
+          await prisma.scrapeJob.update({
+            where: { id: job.id },
+            data: {
+              status: "RUNNING",
+              startedAt: new Date(),
+            },
+          });
+
+          let result;
+          if (source === "GNEWS") {
+            result = officialId ? await scrapeOne(officialId) : await scrapeAll();
+          } else {
+            throw new Error(`Unsupported scrape source: ${source}`);
+          }
+
+          await prisma.scrapeJob.update({
+            where: { id: job.id },
+            data: {
+              status: "COMPLETED",
+              completedAt: new Date(),
+              result: JSON.stringify(result || {}),
+              error: null,
+            },
+          });
+        } catch (error) {
+          await prisma.scrapeJob.update({
+            where: { id: job.id },
+            data: {
+              status: "FAILED",
+              completedAt: new Date(),
+              error: error?.message || "Scrape failed",
+            },
+          });
+        }
+      })().catch((error) => {
+        console.error("[GraphQL triggerScrape] background failure", error);
+      });
+
+      return job;
     },
   },
 

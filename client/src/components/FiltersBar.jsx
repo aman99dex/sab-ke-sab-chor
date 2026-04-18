@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { useMutation } from "@apollo/client/react";
-import { TRIGGER_SCRAPE } from "../graphql";
 
 const LEVEL_TABS = [
   { label: "All Levels", value: null, icon: "🌐" },
@@ -28,7 +26,6 @@ const PARTIES = [
 export default function Filters({ filter, setFilter }) {
   const [showState, setShowState] = useState(false);
   const [showParty, setShowParty] = useState(false);
-  const [triggerScrape] = useMutation(TRIGGER_SCRAPE);
 
   return (
     <div className="filters-section">

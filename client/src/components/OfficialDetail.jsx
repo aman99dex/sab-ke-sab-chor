@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@apollo/client/react";
-import { GET_OFFICIAL, TRIGGER_SCRAPE } from "../graphql";
+import { useQuery } from "@apollo/client/react";
+import { GET_OFFICIAL } from "../graphql";
 import { getInitials } from "../utils";
 import LevelBadge from "./LevelBadge";
 import NewsPanel from "./NewsPanel";
@@ -58,7 +58,6 @@ const TABS = ["Overview", "Promises", "Allegations", "Claims", "News", "Assets"]
 
 export default function OfficialDetail({ id, onBack }) {
   const [activeTab, setActiveTab] = useState("Overview");
-  const [triggerScrape] = useMutation(TRIGGER_SCRAPE);
 
   const { loading, error, data, refetch } = useQuery(GET_OFFICIAL, { variables: { id } });
 
@@ -71,8 +70,12 @@ export default function OfficialDetail({ id, onBack }) {
   const initials = getInitials(o.name);
 
   const handleScrape = async () => {
-    await triggerScrape({ variables: { officialId: id } });
-    setTimeout(() => refetch(), 3000);
+    await fetch("/api/scrape/trigger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ officialId: id }),
+    });
+    setTimeout(() => refetch(), 1200);
   };
 
   return (
@@ -116,7 +119,7 @@ export default function OfficialDetail({ id, onBack }) {
             <span className="dqs-label">Claims</span>
           </div>
           <div className="detail-quick-stat">
-            <span className="dqs-val">{o.newsHeadlines?.length || 0}</span>
+            <span className="dqs-val">{o.newsArticles?.length || 0}</span>
             <span className="dqs-label">News</span>
           </div>
         </div>
@@ -271,7 +274,7 @@ export default function OfficialDetail({ id, onBack }) {
 
         {/* NEWS */}
         {activeTab === "News" && (
-          <NewsPanel headlines={o.newsHeadlines} onTriggerScrape={handleScrape} />
+          <NewsPanel headlines={o.newsArticles} onTriggerScrape={handleScrape} />
         )}
 
         {/* ASSETS */}

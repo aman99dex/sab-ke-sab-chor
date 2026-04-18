@@ -6,9 +6,20 @@ import OfficialsList from "./components/OfficialsList";
 import OfficialDetail from "./components/OfficialDetail";
 import SubmitClaim from "./components/SubmitClaim";
 import DashboardPage from "./components/DashboardPage";
+import GlobalPeopleSearch from "./components/GlobalPeopleSearch";
+import AgentTaskPanel from "./components/AgentTaskPanel";
+import IndiaIntro3D from "./components/IndiaIntro3D";
 import "./App.css";
 
 function App() {
+  const [showIntro, setShowIntro] = useState(() => {
+    try {
+      return sessionStorage.getItem("neta:introSeen") !== "1";
+    } catch {
+      return true;
+    }
+  });
+  const [isIntroLeaving, setIsIntroLeaving] = useState(false);
   const [page, setPage] = useState("home");
   const [selectedId, setSelectedId] = useState(null);
   const [filter, setFilter] = useState({
@@ -36,15 +47,40 @@ function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const enterApp = () => {
+    if (isIntroLeaving) return;
+    setIsIntroLeaving(true);
+    setPage("dashboard");
+    setTimeout(() => {
+      setShowIntro(false);
+      setIsIntroLeaving(false);
+    }, 1300);
+
+    try {
+      sessionStorage.setItem("neta:introSeen", "1");
+    } catch {
+      // Ignore storage errors in private browsing.
+    }
+  };
+
   return (
     <>
-      <Background3D />
-      <div className="app-container">
+      <Background3D mode={showIntro ? "intro" : "app"} />
+
+      {showIntro && (
+        <div className={`intro-layer ${isIntroLeaving ? "leaving" : ""}`}>
+          <IndiaIntro3D onEnter={enterApp} isExiting={isIntroLeaving} />
+        </div>
+      )}
+
+      <div className={`app-container ${showIntro ? "app-hidden" : "app-visible"}`}>
         <Header page={page} onNavigate={navigate} />
         <main className="main-content">
           {page === "home" && (
             <>
               <HeroSection onExplore={(p) => (p === "submit" ? navigate("submit") : document.getElementById("officials-grid")?.scrollIntoView({ behavior: "smooth" }))} />
+              <GlobalPeopleSearch />
+              <AgentTaskPanel />
               <div id="officials-grid">
                 <OfficialsList
                   filter={filter}

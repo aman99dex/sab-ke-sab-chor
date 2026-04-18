@@ -1,78 +1,60 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Stars } from "@react-three/drei";
-import { useRef, useMemo } from "react";
+import { useMemo, useRef } from "react";
 
-function Globe() {
-  const globeRef = useRef();
-  const ringRef = useRef();
+function SirenLights({ mode }) {
+  const redRef = useRef(null);
+  const blueRef = useRef(null);
 
-  useFrame((_, delta) => {
-    if (globeRef.current) globeRef.current.rotation.y += delta * 0.07;
-    if (ringRef.current) {
-      ringRef.current.rotation.z += delta * 0.05;
-      ringRef.current.rotation.x += delta * 0.012;
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (redRef.current) {
+      redRef.current.position.x = Math.sin(t * 0.6) * 6;
+      redRef.current.position.z = 6 + Math.cos(t * 0.5) * 2;
+      redRef.current.intensity = mode === "intro" ? 1.8 : 1.25;
+    }
+    if (blueRef.current) {
+      blueRef.current.position.x = Math.cos(t * 0.52 + 1.8) * 6;
+      blueRef.current.position.z = 5 + Math.sin(t * 0.4) * 2;
+      blueRef.current.intensity = mode === "intro" ? 1.4 : 1.0;
     }
   });
 
   return (
-    <group position={[4.5, 0.5, -4]}>
-      {/* Core wireframe sphere */}
-      <mesh ref={globeRef}>
-        <icosahedronGeometry args={[2, 3]} />
-        <meshBasicMaterial color="#6366f1" wireframe transparent opacity={0.1} />
-      </mesh>
-      {/* Inner solid glow */}
-      <mesh>
-        <sphereGeometry args={[1.96, 32, 32]} />
-        <meshBasicMaterial color="#6366f1" transparent opacity={0.025} />
-      </mesh>
-      {/* Orbit ring */}
-      <mesh ref={ringRef} rotation={[Math.PI / 3.5, 0.5, 0]}>
-        <torusGeometry args={[2.9, 0.012, 6, 80]} />
-        <meshBasicMaterial color="#818cf8" transparent opacity={0.25} />
-      </mesh>
-      {/* Second tilt ring */}
-      <mesh rotation={[Math.PI / 6, 1.2, 0]}>
-        <torusGeometry args={[3.3, 0.008, 6, 80]} />
-        <meshBasicMaterial color="#3b82f6" transparent opacity={0.15} />
-      </mesh>
-    </group>
+    <>
+      <pointLight ref={redRef} color="#ef4444" distance={28} decay={1.8} intensity={1.4} position={[5, 2, 6]} />
+      <pointLight ref={blueRef} color="#38bdf8" distance={24} decay={2} intensity={1.0} position={[-5, 1, 5]} />
+    </>
   );
 }
 
-function FloatingParticles() {
-  const ref = useRef();
-  const COUNT = 1800;
+function EvidenceRain() {
+  const ref = useRef(null);
+  const count = 1700;
 
   const [positions, colors] = useMemo(() => {
-    const pos = new Float32Array(COUNT * 3);
-    const col = new Float32Array(COUNT * 3);
+    const pos = new Float32Array(count * 3);
+    const col = new Float32Array(count * 3);
 
-    for (let i = 0; i < COUNT; i++) {
-      // Spread particles in a wide hemisphere
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(Math.random() * 2 - 1);
-      const r = 5 + Math.random() * 18;
+    for (let i = 0; i < count; i++) {
+      pos[i * 3] = (Math.random() - 0.5) * 34;
+      pos[i * 3 + 1] = (Math.random() - 0.5) * 16;
+      pos[i * 3 + 2] = -Math.random() * 24;
 
-      pos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 12;
-
-      // Gradient from purple (#6366f1) to blue (#3b82f6)
       const t = Math.random();
-      col[i * 3] = 0.22 + t * 0.16;      // R
-      col[i * 3 + 1] = 0.40 + t * 0.10; // G
-      col[i * 3 + 2] = 0.95 - t * 0.33; // B
+      col[i * 3] = 0.6 + t * 0.3;
+      col[i * 3 + 1] = 0.12 + t * 0.38;
+      col[i * 3 + 2] = 0.12 + (1 - t) * 0.68;
     }
+
     return [pos, col];
   }, []);
 
   useFrame(({ clock }) => {
-    if (ref.current) {
-      const t = clock.getElapsedTime();
-      ref.current.rotation.y = t * 0.006;
-      ref.current.rotation.x = Math.sin(t * 0.004) * 0.08;
-    }
+    if (!ref.current) return;
+    const t = clock.getElapsedTime();
+    ref.current.rotation.y = t * 0.018;
+    ref.current.position.y = Math.sin(t * 0.23) * 0.5;
   });
 
   return (
@@ -81,58 +63,89 @@ function FloatingParticles() {
         <bufferAttribute attach="attributes-position" args={[positions, 3]} />
         <bufferAttribute attach="attributes-color" args={[colors, 3]} />
       </bufferGeometry>
-      <pointsMaterial
-        size={0.055}
-        vertexColors
-        transparent
-        opacity={0.55}
-        sizeAttenuation
-      />
+      <pointsMaterial size={0.045} vertexColors transparent opacity={0.56} sizeAttenuation />
     </points>
   );
 }
 
-function GridPlane() {
-  const ref = useRef();
+function CrimeGrid() {
+  const groupRef = useRef(null);
+
   useFrame(({ clock }) => {
-    if (ref.current) {
-      ref.current.position.y = -4 + (Math.sin(clock.getElapsedTime() * 0.3) * 0.3);
-    }
+    if (!groupRef.current) return;
+    const t = clock.getElapsedTime();
+    groupRef.current.rotation.z = Math.sin(t * 0.07) * 0.04;
+    groupRef.current.position.y = -3 + Math.sin(t * 0.3) * 0.2;
   });
 
   return (
-    <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} position={[0, -4, 0]}>
-      <planeGeometry args={[40, 40, 20, 20]} />
-      <meshBasicMaterial color="#6366f1" wireframe transparent opacity={0.04} />
-    </mesh>
+    <group ref={groupRef}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -3, -4]}>
+        <planeGeometry args={[56, 56, 32, 32]} />
+        <meshBasicMaterial color="#ef4444" wireframe transparent opacity={0.05} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -3.2, -4]}>
+        <planeGeometry args={[56, 56, 18, 18]} />
+        <meshBasicMaterial color="#38bdf8" wireframe transparent opacity={0.04} />
+      </mesh>
+    </group>
   );
 }
 
-export default function Background3D() {
+function WireNodes() {
+  const group = useRef(null);
+  const nodes = useMemo(
+    () => [
+      [-5, 1.5, -8],
+      [-2, 0.6, -6],
+      [1, 1.3, -7],
+      [4, 0.2, -8],
+      [-3, -0.9, -9],
+      [2.4, -1.1, -10],
+      [0, 2.2, -9],
+    ],
+    []
+  );
+
+  useFrame(({ clock }) => {
+    if (!group.current) return;
+    group.current.rotation.y = Math.sin(clock.getElapsedTime() * 0.08) * 0.18;
+  });
+
+  return (
+    <group ref={group}>
+      {nodes.map((node, index) => (
+        <mesh key={`${node.join("-")}-${index}`} position={node}>
+          <sphereGeometry args={[0.11, 18, 18]} />
+          <meshStandardMaterial
+            color={index % 2 === 0 ? "#ef4444" : "#38bdf8"}
+            emissive={index % 2 === 0 ? "#b91c1c" : "#0369a1"}
+            emissiveIntensity={0.65}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+export default function Background3D({ mode = "app" }) {
   return (
     <div className="canvas-bg">
       <Canvas
-        camera={{ position: [0, 0, 9], fov: 55 }}
-        gl={{
-          antialias: true,
-          alpha: true,
-          powerPreference: "high-performance",
-        }}
+        camera={{ position: [0, 0, 10], fov: 54 }}
+        gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
         style={{ background: "transparent" }}
         dpr={[1, 1.5]}
       >
-        <Stars
-          radius={90}
-          depth={60}
-          count={4500}
-          factor={2.5}
-          saturation={0}
-          fade
-          speed={0.4}
-        />
-        <Globe />
-        <FloatingParticles />
-        <GridPlane />
+        <fog attach="fog" args={["#020617", 9, 34]} />
+        <ambientLight intensity={0.24} />
+        <directionalLight position={[3, 9, 6]} intensity={0.54} color="#e2e8f0" />
+
+        <Stars radius={95} depth={52} count={3400} factor={2.8} saturation={0} fade speed={0.3} />
+        <SirenLights mode={mode} />
+        <EvidenceRain />
+        <CrimeGrid />
+        <WireNodes />
       </Canvas>
     </div>
   );
