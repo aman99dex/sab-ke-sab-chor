@@ -10,6 +10,8 @@ import { typeDefs } from "./schema.js";
 import { resolvers } from "./resolvers.js";
 import prisma from "./db.js";
 import { startScraperDaemon } from "./scraper.js";
+import { runAgentTask } from "./agentTasks.js";
+import { getExternalIntelCacheStats, getPersonProfile, searchPeopleGlobal } from "./externalIntel.js";
 
 const PORT = process.env.PORT || 4000;
 const ALLOWED_CATEGORIES = ["profiles", "promises", "allegations", "claims", "evidence", "documents"];
@@ -90,6 +92,66 @@ app.get("/api/stats", async (req, res) => {
   res.json({ officials, promises, courtCases, claims, news });
 });
 
+// Global people search (Google CSE if configured, with public-source fallback)
+app.get("/api/people/search", async (req, res) => {
+  const query = String(req.query.q || "").trim();
+  const limit = Number(req.query.limit) || 8;
+
+  if (query.length < 2) {
+    return res.status(400).json({
+      error: "Query must be at least 2 characters",
+    });
+  }
+
+  const results = await searchPeopleGlobal(query, { limit });
+  res.json({
+    query,
+    count: results.length,
+    results,
+    cache: "server-memory",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get("/api/people/profile", async (req, res) => {
+  const name = String(req.query.name || "").trim();
+  if (!name) {
+    return res.status(400).json({ error: "name query param is required" });
+  }
+
+  const profile = await getPersonProfile(name);
+  if (!profile) {
+    return res.status(404).json({ error: "Profile not found" });
+  }
+
+  return res.json(profile);
+});
+
+app.post("/api/agents/run", express.json(), async (req, res) => {
+  const { taskType, payload } = req.body || {};
+  if (!taskType) {
+    return res.status(400).json({ error: "taskType is required" });
+  }
+
+  try {
+    const result = await runAgentTask(taskType, payload || {});
+    if (result.status === "error") {
+      return res.status(400).json(result);
+    }
+    return res.json(result);
+  } catch (err) {
+    return res.status(500).json({
+      taskType,
+      status: "error",
+      error: err.message,
+    });
+  }
+});
+
+app.get("/api/cache/stats", (req, res) => {
+  res.json(getExternalIntelCacheStats());
+});
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const category = req.params.category;
@@ -133,6 +195,8 @@ httpServer.listen(PORT, () => {
   console.log(`GraphQL:        http://localhost:${PORT}/graphql`);
   console.log(`Health check:   http://localhost:${PORT}/api/health`);
   console.log(`DB stats:       http://localhost:${PORT}/api/stats`);
+  console.log(`People search:  http://localhost:${PORT}/api/people/search?q=name`);
+  console.log(`Agent tasks:    POST http://localhost:${PORT}/api/agents/run`);
   console.log(`File upload:    POST http://localhost:${PORT}/upload/:category`);
   console.log(`Files served:   http://localhost:${PORT}/uploads/`);
   console.log(`Scrape trigger: POST http://localhost:${PORT}/api/scrape/trigger`);
