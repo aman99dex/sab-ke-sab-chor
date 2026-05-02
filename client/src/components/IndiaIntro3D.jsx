@@ -13,7 +13,7 @@ export default function IndiaIntro3D({ onEnter, isExiting }) {
   const triggerLaunch = () => {
     if (launching || isExiting) return;
     setLaunching(true);
-    setTimeout(() => onEnter(), 700);
+    setTimeout(() => onEnter(selectedState || null), 700);
   };
 
   return (
@@ -71,7 +71,11 @@ export default function IndiaIntro3D({ onEnter, isExiting }) {
               onClick={triggerLaunch}
               disabled={launching || isExiting}
             >
-              {launching ? "Loading…" : "Launch Dashboard →"}
+              {launching
+              ? "Loading…"
+              : selectedState
+              ? `Explore ${selectedState} Officials →`
+              : "Launch Dashboard →"}
             </button>
           </div>
 

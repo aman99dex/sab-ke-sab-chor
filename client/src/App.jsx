@@ -47,10 +47,15 @@ function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const enterApp = () => {
+  const enterApp = (selectedState = null) => {
     if (isIntroLeaving) return;
     setIsIntroLeaving(true);
-    setPage("dashboard");
+    if (selectedState) {
+      setFilter((f) => ({ ...f, state: selectedState }));
+      setPage("home");
+    } else {
+      setPage("dashboard");
+    }
     setTimeout(() => {
       setShowIntro(false);
       setIsIntroLeaving(false);

@@ -75,6 +75,19 @@ export const GET_OFFICIAL = gql`
         createdAt
         verifiedAt
       }
+      courtCases {
+        id
+        caseNumber
+        court
+        caseType
+        status
+        charges
+        filingDate
+        lastHearingDate
+        nextHearingDate
+        judgmentSummary
+        sourceUrl
+      }
       newsArticles {
         title
         url
@@ -141,18 +154,6 @@ export const VERIFY_CLAIM = gql`
       aiVerificationNote
       aiConfidence
       verifiedAt
-    }
-  }
-`;
-
-export const TRIGGER_SCRAPE = gql`
-  mutation TriggerScrape($source: String!, $officialId: ID) {
-    triggerScrape(source: $source, officialId: $officialId) {
-      id
-      source
-      status
-      targetId
-      createdAt
     }
   }
 `;

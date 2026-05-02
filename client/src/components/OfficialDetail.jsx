@@ -54,7 +54,7 @@ function AiBadge({ note, confidence }) {
   );
 }
 
-const TABS = ["Overview", "Promises", "Allegations", "Claims", "News", "Assets"];
+const TABS = ["Overview", "Promises", "Allegations", "Court Cases", "Claims", "News", "Assets"];
 
 export default function OfficialDetail({ id, onBack }) {
   const [activeTab, setActiveTab] = useState("Overview");
@@ -243,6 +243,55 @@ export default function OfficialDetail({ id, onBack }) {
                     </a>
                   )}
                   <span className="date-label">Filed {formatDate(a.createdAt)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* COURT CASES */}
+        {activeTab === "Court Cases" && (
+          <div>
+            {(!o.courtCases || o.courtCases.length === 0) && (
+              <div className="empty-state">No court cases on record.</div>
+            )}
+            {(o.courtCases || []).map((cc) => (
+              <div className="allegation-card" key={cc.id}>
+                <div className="card-row-top">
+                  <span className={`status ${cc.status.toLowerCase().replace(/ /g, "_")}`}>
+                    {cc.status}
+                  </span>
+                  <span className="claim-type-badge">{cc.caseType}</span>
+                  <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: "auto" }}>
+                    🏛️ {cc.court}
+                  </span>
+                </div>
+                <h4>Case No: {cc.caseNumber}</h4>
+                {cc.charges && cc.charges.length > 0 && (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                    {cc.charges.map((ch, i) => (
+                      <span key={i} className="claim-type-badge sm">{ch}</span>
+                    ))}
+                  </div>
+                )}
+                {cc.judgmentSummary && <p>{cc.judgmentSummary}</p>}
+                <div className="card-footer">
+                  {cc.filingDate && (
+                    <span className="date-label">Filed {formatDate(cc.filingDate)}</span>
+                  )}
+                  {cc.lastHearingDate && (
+                    <span className="date-label">Last hearing {formatDate(cc.lastHearingDate)}</span>
+                  )}
+                  {cc.nextHearingDate && (
+                    <span className="date-label" style={{ color: "var(--orange)" }}>
+                      Next {formatDate(cc.nextHearingDate)}
+                    </span>
+                  )}
+                  {cc.sourceUrl && (
+                    <a href={cc.sourceUrl} target="_blank" rel="noreferrer" className="source-link">
+                      🔗 Source
+                    </a>
+                  )}
                 </div>
               </div>
             ))}
