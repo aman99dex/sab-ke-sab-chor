@@ -285,15 +285,6 @@
   flex-wrap: wrap;
 }
 
-.state-preview-chip {
-  align-self: flex-start;
-  font-size: 12px;
-  color: #fca5a5;
-  border: 1px solid rgba(248, 113, 113, 0.55);
-  background: rgba(127, 29, 29, 0.36);
-  border-radius: 999px;
-  padding: 6px 12px;
-}
 
 .btn-primary {
   padding: 14px 32px;
@@ -1373,46 +1364,100 @@
 .pci-meta { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
 
 /* ========================================
+   CANVAS BACKGROUND (replaces Three.js)
+   ======================================== */
+.canvas-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.canvas-bg canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* ========================================
    INTRO + GLOBAL SEARCH + AGENT PANEL
    ======================================== */
 .india-intro-wrap {
   position: relative;
   min-height: 100vh;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 24% 17%, rgba(14, 165, 233, 0.24), transparent 52%),
-    radial-gradient(circle at 78% 74%, rgba(239, 68, 68, 0.22), transparent 50%),
-    #020617;
+  background: #020617;
 }
 
-.india-intro-canvas {
+.india-intro-wrap.exiting {
+  opacity: 0;
+  transform: scale(1.03);
+  filter: blur(10px);
+  transition: all 0.7s ease;
+}
+
+.intro-bg-layer {
   position: absolute;
   inset: 0;
+  z-index: 0;
 }
 
-.india-intro-overlay {
+/* Two-column layout for intro */
+.india-intro-layout {
   position: relative;
   z-index: 2;
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 14px;
-  padding: 24px 24px 32px;
-  max-width: 760px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  padding: 0 48px;
+  gap: 32px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
+.intro-left-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 48px 0;
+}
+
+.intro-right-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 0;
+}
+
+/* Badge */
 .intro-badge {
   align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 7px;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 1.2px;
   color: #f1f5f9;
   border: 1px solid rgba(239, 68, 68, 0.5);
   border-radius: 999px;
-  padding: 6px 12px;
+  padding: 6px 14px;
   background: rgba(127, 29, 29, 0.36);
   animation: badgePulse 2.6s ease-in-out infinite;
+}
+
+.badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  display: inline-block;
+  animation: badgeDotBlink 1.3s ease-in-out infinite;
+}
+
+@keyframes badgeDotBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }
 
 @keyframes badgePulse {
@@ -1421,27 +1466,196 @@
   100% { box-shadow: 0 0 0 rgba(239, 68, 68, 0); }
 }
 
-.india-intro-overlay h1 {
+/* Headline */
+.intro-headline {
   font-family: "Space Grotesk", sans-serif;
-  font-size: clamp(36px, 7vw, 66px);
-  line-height: 1.03;
+  font-size: clamp(36px, 4.5vw, 62px);
+  line-height: 1.08;
   letter-spacing: -1.5px;
-  text-shadow: 0 0 28px rgba(2, 132, 199, 0.25);
 }
 
-.india-intro-overlay p {
-  max-width: 620px;
-  color: #cbd5e1;
-  line-height: 1.7;
+.headline-neta {
+  background: linear-gradient(135deg, #ef4444, #f97316, #fbbf24);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-size: 1.25em;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.headline-sub {
+  color: #e2e8f0;
+  display: block;
+  font-size: 0.72em;
+  letter-spacing: -0.5px;
+  line-height: 1.4;
+}
+
+.headline-sub2 {
+  color: #94a3b8;
+  display: block;
+  font-size: 0.58em;
+  letter-spacing: -0.3px;
+  font-weight: 500;
+}
+
+.intro-desc {
+  max-width: 500px;
+  color: #94a3b8;
+  line-height: 1.75;
   font-size: 15px;
+}
+
+/* Intro stats */
+.intro-stats-row {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.intro-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ist-val {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.ist-lbl {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.state-preview-chip {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: #fca5a5;
+  border: 1px solid rgba(248, 113, 113, 0.55);
+  background: rgba(127, 29, 29, 0.36);
+  border-radius: 999px;
+  padding: 6px 14px;
+}
+
+.spc-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+  display: inline-block;
+  animation: badgeDotBlink 1s infinite;
 }
 
 .intro-actions {
   display: flex;
   gap: 10px;
-  margin-top: 6px;
-  padding-bottom: 12px;
   flex-wrap: wrap;
+}
+
+.btn-primary.loading {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.intro-sources {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* Map panel */
+.map-glow-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 550px;
+  height: 700px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(14,165,233,0.07), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.india-svg-wrap {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 540px;
+}
+
+.india-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 0 24px rgba(14,165,233,0.15));
+}
+
+.india-map-tooltip {
+  position: absolute;
+  bottom: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(2,6,23,0.9);
+  border: 1px solid rgba(148,163,184,0.25);
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  backdrop-filter: blur(12px);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.map-tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.india-map-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.map-caption {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  letter-spacing: 0.3px;
+}
+
+.india-intro-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.india-intro-canvas-fallback {
+  width: 100%;
+  height: 100%;
+  background: #020617;
 }
 
 .global-search-section,
@@ -1769,6 +1983,18 @@
   .header-stats { display: none; }
 }
 
+@media (max-width: 960px) {
+  .india-intro-layout {
+    grid-template-columns: 1fr;
+    padding: 40px 28px 32px;
+    min-height: unset;
+  }
+  .intro-left-panel { padding: 0; }
+  .intro-right-panel { padding: 0 0 24px; }
+  .india-svg-wrap { max-width: 420px; margin: 0 auto; }
+  .map-glow-ring { display: none; }
+}
+
 @media (max-width: 768px) {
   .main-content { padding: 0 16px 60px; }
   .hero-title { letter-spacing: -1px; }
@@ -1784,21 +2010,11 @@
   .tab-bar { border-radius: 12px; }
   .overview-grid { grid-template-columns: 1fr; }
   .footer-inner { flex-direction: column; text-align: center; }
-  .india-intro-overlay {
-    justify-content: flex-end;
-    padding: 18px;
-  }
-  .intro-actions {
-    width: 100%;
-  }
-  .intro-actions .btn-primary,
-  .intro-actions .btn-ghost {
-    flex: 1 1 180px;
-    justify-content: center;
-  }
-  .global-results-grid {
-    grid-template-columns: 1fr;
-  }
+  .india-intro-layout { padding: 28px 18px 24px; gap: 20px; }
+  .intro-stats-row { gap: 16px; }
+  .intro-actions { width: 100%; }
+  .intro-actions .btn-primary { flex: 1; justify-content: center; }
+  .global-results-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {
@@ -1807,4 +2023,7 @@
   .dash-stats-grid { grid-template-columns: repeat(2, 1fr); }
   .level-breakdown { grid-template-columns: 1fr; }
   .header-inner { height: auto; padding: 12px 16px; }
+  .india-intro-layout { padding: 20px 14px; }
+  .intro-headline { font-size: clamp(28px, 9vw, 44px); }
+  .india-svg-wrap { max-width: 340px; }
 }

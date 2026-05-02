@@ -3,6 +3,7 @@
 
 import prisma from "./db.js";
 import { scrapeAll, scrapeOne } from "./scraper.js";
+import { verifyClaim as aiVerify } from "./aiVerifier.js";
 
 // Helper: parse JSON string fields (proofImages, evidence, charges, sections)
 const parseJsonArray = (str) => {
@@ -276,9 +277,9 @@ export const resolvers = {
       return true;
     },
 
-    // Claims (anonymous submission)
+    // Claims (anonymous submission + auto AI verification)
     submitClaim: async (_, { input }) => {
-      return prisma.claim.create({
+      const claim = await prisma.claim.create({
         data: {
           officialId: input.officialId,
           submittedBy: input.submittedBy || "Anonymous",
@@ -289,6 +290,29 @@ export const resolvers = {
           linkedAllegationId: input.linkedAllegationId || null,
         },
       });
+
+      // Auto-trigger AI verification in background (non-blocking)
+      (async () => {
+        try {
+          const official = await prisma.official.findUnique({ where: { id: input.officialId } });
+          const result = await aiVerify(input.title, input.description, official?.name || "Unknown");
+          await prisma.claim.update({
+            where: { id: claim.id },
+            data: {
+              status: result.claimStatus,
+              aiVerificationNote: result.note,
+              aiConfidence: result.confidence,
+              aiModel: result.model,
+              verifiedAt: new Date(),
+            },
+          });
+          console.log(`[AI] Claim "${input.title}" auto-verified: ${result.label} (${result.confidence}%)`);
+        } catch (err) {
+          console.error("[AI] Auto-verify failed:", err.message);
+        }
+      })();
+
+      return claim;
     },
 
     verifyClaim: async (_, { id, input }) => {

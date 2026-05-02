@@ -1,176 +1,149 @@
-import { Canvas, useFrame } from "@react-three/fiber";
-import { Stars } from "@react-three/drei";
-import { useMemo, useRef, Component } from "react";
-
-class WebGLErrorBoundary extends Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false };
-  }
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback || null;
-    }
-    return this.props.children;
-  }
-}
-
-function SirenLights({ mode }) {
-  const redRef = useRef(null);
-  const blueRef = useRef(null);
-
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    if (redRef.current) {
-      redRef.current.position.x = Math.sin(t * 0.6) * 6;
-      redRef.current.position.z = 6 + Math.cos(t * 0.5) * 2;
-      redRef.current.intensity = mode === "intro" ? 1.8 : 1.25;
-    }
-    if (blueRef.current) {
-      blueRef.current.position.x = Math.cos(t * 0.52 + 1.8) * 6;
-      blueRef.current.position.z = 5 + Math.sin(t * 0.4) * 2;
-      blueRef.current.intensity = mode === "intro" ? 1.4 : 1.0;
-    }
-  });
-
-  return (
-    <>
-      <pointLight ref={redRef} color="#ef4444" distance={28} decay={1.8} intensity={1.4} position={[5, 2, 6]} />
-      <pointLight ref={blueRef} color="#38bdf8" distance={24} decay={2} intensity={1.0} position={[-5, 1, 5]} />
-    </>
-  );
-}
-
-function EvidenceRain() {
-  const ref = useRef(null);
-  const count = 1700;
-
-  const [positions, colors] = useMemo(() => {
-    const pos = new Float32Array(count * 3);
-    const col = new Float32Array(count * 3);
-
-    for (let i = 0; i < count; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 34;
-      pos[i * 3 + 1] = (Math.random() - 0.5) * 16;
-      pos[i * 3 + 2] = -Math.random() * 24;
-
-      const t = Math.random();
-      col[i * 3] = 0.6 + t * 0.3;
-      col[i * 3 + 1] = 0.12 + t * 0.38;
-      col[i * 3 + 2] = 0.12 + (1 - t) * 0.68;
-    }
-
-    return [pos, col];
-  }, []);
-
-  useFrame(({ clock }) => {
-    if (!ref.current) return;
-    const t = clock.getElapsedTime();
-    ref.current.rotation.y = t * 0.018;
-    ref.current.position.y = Math.sin(t * 0.23) * 0.5;
-  });
-
-  return (
-    <points ref={ref}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-        <bufferAttribute attach="attributes-color" args={[colors, 3]} />
-      </bufferGeometry>
-      <pointsMaterial size={0.045} vertexColors transparent opacity={0.56} sizeAttenuation />
-    </points>
-  );
-}
-
-function CrimeGrid() {
-  const groupRef = useRef(null);
-
-  useFrame(({ clock }) => {
-    if (!groupRef.current) return;
-    const t = clock.getElapsedTime();
-    groupRef.current.rotation.z = Math.sin(t * 0.07) * 0.04;
-    groupRef.current.position.y = -3 + Math.sin(t * 0.3) * 0.2;
-  });
-
-  return (
-    <group ref={groupRef}>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -3, -4]}>
-        <planeGeometry args={[56, 56, 32, 32]} />
-        <meshBasicMaterial color="#ef4444" wireframe transparent opacity={0.05} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -3.2, -4]}>
-        <planeGeometry args={[56, 56, 18, 18]} />
-        <meshBasicMaterial color="#38bdf8" wireframe transparent opacity={0.04} />
-      </mesh>
-    </group>
-  );
-}
-
-function WireNodes() {
-  const group = useRef(null);
-  const nodes = useMemo(
-    () => [
-      [-5, 1.5, -8],
-      [-2, 0.6, -6],
-      [1, 1.3, -7],
-      [4, 0.2, -8],
-      [-3, -0.9, -9],
-      [2.4, -1.1, -10],
-      [0, 2.2, -9],
-    ],
-    []
-  );
-
-  useFrame(({ clock }) => {
-    if (!group.current) return;
-    group.current.rotation.y = Math.sin(clock.getElapsedTime() * 0.08) * 0.18;
-  });
-
-  return (
-    <group ref={group}>
-      {nodes.map((node, index) => (
-        <mesh key={`${node.join("-")}-${index}`} position={node}>
-          <sphereGeometry args={[0.11, 18, 18]} />
-          <meshStandardMaterial
-            color={index % 2 === 0 ? "#ef4444" : "#38bdf8"}
-            emissive={index % 2 === 0 ? "#b91c1c" : "#0369a1"}
-            emissiveIntensity={0.65}
-          />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-function Background3DCanvas({ mode }) {
-  return (
-    <Canvas
-      camera={{ position: [0, 0, 10], fov: 54 }}
-      gl={{ antialias: true, alpha: true, powerPreference: "high-performance", failIfMajorPerformanceCaveat: false }}
-      style={{ background: "transparent" }}
-      dpr={[1, 1.5]}
-    >
-      <fog attach="fog" args={["#020617", 9, 34]} />
-      <ambientLight intensity={0.24} />
-      <directionalLight position={[3, 9, 6]} intensity={0.54} color="#e2e8f0" />
-
-      <Stars radius={95} depth={52} count={3400} factor={2.8} saturation={0} fade speed={0.3} />
-      <SirenLights mode={mode} />
-      <EvidenceRain />
-      <CrimeGrid />
-      <WireNodes />
-    </Canvas>
-  );
-}
+import { useEffect, useRef } from "react";
 
 export default function Background3D({ mode = "app" }) {
+  const canvasRef = useRef(null);
+  const animRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+
+    const PARTICLE_COUNT = mode === "intro" ? 180 : 120;
+
+    const particles = Array.from({ length: PARTICLE_COUNT }, () => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      r: Math.random() * 1.4 + 0.2,
+      vx: (Math.random() - 0.5) * 0.22,
+      vy: (Math.random() - 0.5) * 0.22,
+      alpha: Math.random() * 0.7 + 0.15,
+      color: Math.random() > 0.6 ? "#ef4444" : Math.random() > 0.5 ? "#38bdf8" : "#6366f1",
+      pulse: Math.random() * Math.PI * 2,
+      pulseSpeed: 0.015 + Math.random() * 0.02,
+    }));
+
+    const gridLines = Array.from({ length: 12 }, (_, i) => ({
+      x: (width / 11) * i,
+      alpha: 0.025 + Math.random() * 0.02,
+    }));
+    const hGridLines = Array.from({ length: 9 }, (_, i) => ({
+      y: (height / 8) * i,
+      alpha: 0.02 + Math.random() * 0.02,
+    }));
+
+    let frame = 0;
+
+    function draw() {
+      frame++;
+      ctx.clearRect(0, 0, width, height);
+
+      // Dark gradient background
+      const bg = ctx.createLinearGradient(0, 0, width, height);
+      bg.addColorStop(0, "#020617");
+      bg.addColorStop(0.5, "#0a0f1e");
+      bg.addColorStop(1, "#0d0512");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, width, height);
+
+      // Red glow top-right (siren effect)
+      const t = frame * 0.012;
+      const redX = width * 0.75 + Math.sin(t * 0.8) * 80;
+      const redGrad = ctx.createRadialGradient(redX, height * 0.15, 0, redX, height * 0.15, 320);
+      redGrad.addColorStop(0, `rgba(239,68,68,${0.08 + Math.sin(t * 1.3) * 0.04})`);
+      redGrad.addColorStop(1, "transparent");
+      ctx.fillStyle = redGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      // Blue glow bottom-left
+      const blueX = width * 0.2 + Math.cos(t * 0.6) * 60;
+      const blueGrad = ctx.createRadialGradient(blueX, height * 0.75, 0, blueX, height * 0.75, 280);
+      blueGrad.addColorStop(0, `rgba(56,189,248,${0.07 + Math.sin(t * 1.1 + 1) * 0.03})`);
+      blueGrad.addColorStop(1, "transparent");
+      ctx.fillStyle = blueGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      // Grid lines
+      for (const gl of gridLines) {
+        ctx.beginPath();
+        ctx.moveTo(gl.x, 0);
+        ctx.lineTo(gl.x, height);
+        ctx.strokeStyle = `rgba(239,68,68,${gl.alpha})`;
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+      }
+      for (const gl of hGridLines) {
+        ctx.beginPath();
+        ctx.moveTo(0, gl.y);
+        ctx.lineTo(width, gl.y);
+        ctx.strokeStyle = `rgba(56,189,248,${gl.alpha})`;
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+      }
+
+      // Particles
+      for (const p of particles) {
+        p.pulse += p.pulseSpeed;
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < -4) p.x = width + 4;
+        if (p.x > width + 4) p.x = -4;
+        if (p.y < -4) p.y = height + 4;
+        if (p.y > height + 4) p.y = -4;
+
+        const a = p.alpha * (0.6 + Math.sin(p.pulse) * 0.4);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = p.color.replace(")", `,${a})`).replace("rgb(", "rgba(").replace("#ef4444", `rgba(239,68,68,${a})`).replace("#38bdf8", `rgba(56,189,248,${a})`).replace("#6366f1", `rgba(99,102,241,${a})`);
+        ctx.fill();
+      }
+
+      // Wire connections between nearby particles
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 90) {
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            const a = (1 - dist / 90) * 0.12;
+            ctx.strokeStyle = `rgba(99,102,241,${a})`;
+            ctx.lineWidth = 0.4;
+            ctx.stroke();
+          }
+        }
+      }
+
+      animRef.current = requestAnimationFrame(draw);
+    }
+
+    draw();
+
+    const onResize = () => {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width;
+      canvas.height = height;
+    };
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      cancelAnimationFrame(animRef.current);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [mode]);
+
   return (
     <div className="canvas-bg">
-      <WebGLErrorBoundary fallback={<div className="canvas-bg-fallback" />}>
-        <Background3DCanvas mode={mode} />
-      </WebGLErrorBoundary>
+      <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
     </div>
   );
 }
