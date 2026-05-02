@@ -1658,7 +1658,10 @@
   background: #020617;
 }
 
-.global-search-section,
+.global-search-section {
+  margin-bottom: 0;
+}
+
 /* ========================================
    DAILY AGENT STATUS
    ======================================== */
