@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import Background3D from "./Background3D";
 import Header from "./components/Header";
 import HeroSection from "./components/HeroSection";
@@ -9,9 +10,17 @@ import DashboardPage from "./components/DashboardPage";
 import GlobalPeopleSearch from "./components/GlobalPeopleSearch";
 import AgentTaskPanel from "./components/AgentTaskPanel";
 import IndiaIntro3D from "./components/IndiaIntro3D";
+import AllegationsPage from "./components/AllegationsPage";
+import CourtCasesPage from "./components/CourtCasesPage";
+import NewsPage from "./components/NewsPage";
+import LeaderboardPage from "./components/LeaderboardPage";
+import AboutPage from "./components/AboutPage";
 import "./App.css";
 
-function App() {
+function AppInner() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [showIntro, setShowIntro] = useState(() => {
     try {
       return sessionStorage.getItem("neta:introSeen") !== "1";
@@ -20,57 +29,36 @@ function App() {
     }
   });
   const [isIntroLeaving, setIsIntroLeaving] = useState(false);
-  const [page, setPage] = useState("home");
-  const [selectedId, setSelectedId] = useState(null);
   const [filter, setFilter] = useState({
-    role: null,
-    search: "",
-    level: null,
-    state: null,
-    party: null,
+    role: null, search: "", level: null, state: null, party: null,
   });
-
-  const viewOfficial = (id) => {
-    setSelectedId(id);
-    setPage("detail");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const goHome = () => {
-    setPage("home");
-    setSelectedId(null);
-  };
-
-  const navigate = (p) => {
-    setPage(p);
-    setSelectedId(null);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
 
   const enterApp = (selectedState = null) => {
     if (isIntroLeaving) return;
     setIsIntroLeaving(true);
     if (selectedState) {
       setFilter((f) => ({ ...f, state: selectedState }));
-      setPage("home");
+      navigate("/officials");
     } else {
-      setPage("dashboard");
+      navigate("/dashboard");
     }
     setTimeout(() => {
       setShowIntro(false);
       setIsIntroLeaving(false);
     }, 1300);
-
-    try {
-      sessionStorage.setItem("neta:introSeen", "1");
-    } catch {
-      // Ignore storage errors in private browsing.
-    }
+    try { sessionStorage.setItem("neta:introSeen", "1"); } catch {}
   };
+
+  const viewOfficial = (id) => {
+    navigate(`/official/${id}`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const isIntroPage = showIntro;
 
   return (
     <>
-      <Background3D mode={showIntro ? "intro" : "app"} />
+      <Background3D mode={isIntroPage ? "intro" : "app"} />
 
       {showIntro && (
         <div className={`intro-layer ${isIntroLeaving ? "leaving" : ""}`}>
@@ -79,27 +67,46 @@ function App() {
       )}
 
       <div className={`app-container ${showIntro ? "app-hidden" : "app-visible"}`}>
-        <Header page={page} onNavigate={navigate} />
+        <Header currentPath={location.pathname} />
         <main className="main-content">
-          {page === "home" && (
-            <>
-              <HeroSection onExplore={(p) => (p === "submit" ? navigate("submit") : document.getElementById("officials-grid")?.scrollIntoView({ behavior: "smooth" }))} />
-              <GlobalPeopleSearch />
-              <AgentTaskPanel />
+          <Routes>
+            <Route path="/" element={
+              <>
+                <HeroSection onExplore={(p) => p === "submit" ? navigate("/submit") : document.getElementById("officials-grid")?.scrollIntoView({ behavior: "smooth" })} />
+                <GlobalPeopleSearch />
+                <AgentTaskPanel />
+                <div id="officials-grid">
+                  <OfficialsList filter={filter} setFilter={setFilter} onSelect={viewOfficial} />
+                </div>
+              </>
+            } />
+            <Route path="/officials" element={
               <div id="officials-grid">
-                <OfficialsList
-                  filter={filter}
-                  setFilter={setFilter}
-                  onSelect={viewOfficial}
-                />
+                <OfficialsList filter={filter} setFilter={setFilter} onSelect={viewOfficial} />
               </div>
-            </>
-          )}
-          {page === "detail" && selectedId && (
-            <OfficialDetail id={selectedId} onBack={goHome} />
-          )}
-          {page === "submit" && <SubmitClaim onDone={goHome} />}
-          {page === "dashboard" && <DashboardPage onSelectOfficial={viewOfficial} />}
+            } />
+            <Route path="/official/:id" element={
+              <OfficialDetail onBack={() => navigate(-1)} />
+            } />
+            <Route path="/dashboard" element={
+              <DashboardPage onSelectOfficial={viewOfficial} />
+            } />
+            <Route path="/allegations" element={<AllegationsPage onSelectOfficial={viewOfficial} />} />
+            <Route path="/court-cases" element={<CourtCasesPage onSelectOfficial={viewOfficial} />} />
+            <Route path="/news" element={<NewsPage onSelectOfficial={viewOfficial} />} />
+            <Route path="/leaderboard" element={<LeaderboardPage onSelectOfficial={viewOfficial} />} />
+            <Route path="/submit" element={<SubmitClaim onDone={() => navigate("/officials")} />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="*" element={
+              <div className="empty-state" style={{ marginTop: 80, textAlign: "center" }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+                <h2>Page not found</h2>
+                <button className="btn-primary" style={{ marginTop: 16 }} onClick={() => navigate("/")}>
+                  Go Home
+                </button>
+              </div>
+            } />
+          </Routes>
         </main>
 
         <footer className="app-footer">
@@ -111,9 +118,11 @@ function App() {
             <div className="footer-links">
               <span>Built for transparency 🇮🇳</span>
               <span>·</span>
-              <span>AI by HuggingFace (open source)</span>
+              <span>AI by HuggingFace + Groq</span>
               <span>·</span>
               <span>Data: ECI + public records</span>
+              <span>·</span>
+              <button className="footer-link-btn" onClick={() => navigate("/about")}>About</button>
             </div>
           </div>
         </footer>
@@ -122,4 +131,6 @@ function App() {
   );
 }
 
-export default App;
+export default function App() {
+  return <AppInner />;
+}

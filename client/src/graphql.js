@@ -89,6 +89,7 @@ export const GET_OFFICIAL = gql`
         sourceUrl
       }
       newsArticles {
+        id
         title
         url
         source
@@ -129,6 +130,7 @@ export const GET_STATS_SUMMARY = gql`
       totalClaims
       pendingClaims
       verifiedClaims
+      totalCourtCases
       statesTracked
     }
   }
@@ -175,6 +177,92 @@ export const GET_CLAIMS = gql`
         id
         name
         state
+      }
+    }
+  }
+`;
+
+export const GET_ALLEGATIONS = gql`
+  query GetAllegations($severity: String, $status: String) {
+    allegations(severity: $severity, status: $status) {
+      id
+      title
+      description
+      severity
+      status
+      sourceUrl
+      createdAt
+      official {
+        id
+        name
+        state
+        party
+        role
+      }
+    }
+  }
+`;
+
+export const GET_COURT_CASES = gql`
+  query GetCourtCases($status: String) {
+    courtCases(status: $status) {
+      id
+      caseNumber
+      court
+      caseType
+      status
+      charges
+      filingDate
+      lastHearingDate
+      nextHearingDate
+      judgmentSummary
+      sourceUrl
+      official {
+        id
+        name
+        state
+        party
+      }
+    }
+  }
+`;
+
+export const GET_NEWS = gql`
+  query GetNews($limit: Int) {
+    newsArticles(limit: $limit) {
+      id
+      title
+      url
+      source
+      publishedAt
+      sentiment
+      category
+      officials {
+        id
+        name
+        state
+      }
+    }
+  }
+`;
+
+export const GET_OFFICIALS_FOR_LEADERBOARD = gql`
+  query GetOfficialsLeaderboard {
+    officials(limit: 100) {
+      id
+      name
+      role
+      level
+      party
+      state
+      position
+      assets
+      criminalCases
+      promises {
+        status
+      }
+      allegations {
+        severity
       }
     }
   }

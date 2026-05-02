@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useParams } from "react-router-dom";
 import { useQuery } from "@apollo/client/react";
 import { GET_OFFICIAL } from "../graphql";
 import { getInitials } from "../utils";
@@ -56,8 +57,10 @@ function AiBadge({ note, confidence }) {
 
 const TABS = ["Overview", "Promises", "Allegations", "Court Cases", "Claims", "News", "Assets"];
 
-export default function OfficialDetail({ id, onBack }) {
+export default function OfficialDetail({ onBack }) {
   const [activeTab, setActiveTab] = useState("Overview");
+  const params = useParams();
+  const id = params.id;
 
   const { loading, error, data, refetch } = useQuery(GET_OFFICIAL, { variables: { id } });
 
