@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@apollo/client/react";
 import { GET_STATS_SUMMARY } from "../graphql";
 
-export default function Header({ currentPath }) {
+export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { data } = useQuery(GET_STATS_SUMMARY);
   const stats = data?.statsSummary;
+  const currentPath = location.pathname;
 
   const navItems = [
     { path: "/officials", label: "Officials", icon: "👤" },
@@ -20,9 +22,9 @@ export default function Header({ currentPath }) {
   ];
 
   const isActive = (path) => {
-    if (!currentPath) return false;
     if (path === "/officials" && (currentPath === "/" || currentPath === "/officials")) return true;
-    return currentPath === path || currentPath.startsWith(path + "/");
+    if (path !== "/officials" && currentPath.startsWith(path)) return true;
+    return currentPath === path;
   };
 
   const go = (path) => {
@@ -37,7 +39,7 @@ export default function Header({ currentPath }) {
         <div className="logo" onClick={() => go("/")}>
           <div className="logo-icon"><span>🇮🇳</span></div>
           <div>
-            <div className="logo-text">Neta Watch</div>
+            <div className="logo-text">नेता Watch</div>
             <div className="logo-sub">Political Accountability Platform</div>
           </div>
         </div>

@@ -9,7 +9,8 @@ import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHt
 import { typeDefs } from "./schema.js";
 import { resolvers } from "./resolvers.js";
 import prisma from "./db.js";
-import { startScraperDaemon } from "./scraper.js";
+import { startScraperDaemon, scrapeAll } from "./scraper.js";
+import { startDailyAgent } from "./dailyAgent.js";
 import { runAgentTask } from "./agentTasks.js";
 import { getExternalIntelCacheStats, getPersonProfile, searchPeopleGlobal } from "./externalIntel.js";
 import { getImageProxyCacheStats, getProxyImage } from "./imageProxyCache.js";
@@ -259,21 +260,45 @@ app.post("/upload/:category", upload.single("file"), (req, res) => {
   });
 });
 
-// Start the scraper daemon
+// Start the scraper daemon (every 30 min)
 startScraperDaemon();
 
+// Start the daily AI agent (every 24h at 02:00 AM IST)
+const dailyAgent = startDailyAgent(scrapeAll);
+
+// Daily agent status endpoint
+app.get("/api/agents/daily-status", (_req, res) => {
+  res.json({
+    lastRunAt: dailyAgent.getLastRunAt(),
+    runCount: dailyAgent.getRunCount(),
+    lastStatus: dailyAgent.getStatus(),
+    nextRunAt: "02:00 AM IST daily",
+  });
+});
+
+// Manual trigger for daily agent
+app.post("/api/agents/daily-trigger", async (_req, res) => {
+  try {
+    // Kick off async — don't await, return immediately
+    dailyAgent.triggerNow("manual-api").catch(console.error);
+    res.json({ ok: true, message: "Daily refresh triggered — check /api/agents/daily-status for progress." });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 httpServer.listen(PORT, () => {
-  console.log(`\n🇮🇳  Neta Watch Backend v3.0 (Prisma + SQLite)`);
+  console.log(`\n🇮🇳  Neta Watch Backend v3.0 (Prisma + PostgreSQL)`);
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-  console.log(`GraphQL:        http://localhost:${PORT}/graphql`);
-  console.log(`Health check:   http://localhost:${PORT}/api/health`);
-  console.log(`DB stats:       http://localhost:${PORT}/api/stats`);
-  console.log(`People search:  http://localhost:${PORT}/api/people/search?q=name`);
-  console.log(`Agent tasks:    POST http://localhost:${PORT}/api/agents/run`);
-  console.log(`Image proxy:    http://localhost:${PORT}/api/images/proxy?url=<encoded>`);
-  console.log(`Scrape queue:   POST http://localhost:${PORT}/api/agents/scrape-jobs`);
-  console.log(`File upload:    POST http://localhost:${PORT}/upload/:category`);
-  console.log(`Files served:   http://localhost:${PORT}/uploads/`);
-  console.log(`Scrape trigger: POST http://localhost:${PORT}/api/scrape/trigger`);
+  console.log(`GraphQL:         http://localhost:${PORT}/graphql`);
+  console.log(`Health:          http://localhost:${PORT}/api/health`);
+  console.log(`Stats:           http://localhost:${PORT}/api/stats`);
+  console.log(`People search:   http://localhost:${PORT}/api/people/search?q=name`);
+  console.log(`Agent tasks:     POST http://localhost:${PORT}/api/agents/run`);
+  console.log(`Daily agent:     GET  http://localhost:${PORT}/api/agents/daily-status`);
+  console.log(`Daily trigger:   POST http://localhost:${PORT}/api/agents/daily-trigger`);
+  console.log(`Image proxy:     http://localhost:${PORT}/api/images/proxy?url=<encoded>`);
+  console.log(`Scrape queue:    POST http://localhost:${PORT}/api/agents/scrape-jobs`);
+  console.log(`Scrape trigger:  POST http://localhost:${PORT}/api/scrape/trigger`);
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 });

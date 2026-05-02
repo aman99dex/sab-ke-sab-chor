@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { Routes, Route, useNavigate } from "react-router-dom";
 import Background3D from "./Background3D";
 import Header from "./components/Header";
 import HeroSection from "./components/HeroSection";
@@ -19,7 +19,6 @@ import "./App.css";
 
 function AppInner() {
   const navigate = useNavigate();
-  const location = useLocation();
 
   const [showIntro, setShowIntro] = useState(() => {
     try {
@@ -54,11 +53,9 @@ function AppInner() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const isIntroPage = showIntro;
-
   return (
     <>
-      <Background3D mode={isIntroPage ? "intro" : "app"} />
+      <Background3D mode={showIntro ? "intro" : "app"} />
 
       {showIntro && (
         <div className={`intro-layer ${isIntroLeaving ? "leaving" : ""}`}>
@@ -67,7 +64,7 @@ function AppInner() {
       )}
 
       <div className={`app-container ${showIntro ? "app-hidden" : "app-visible"}`}>
-        <Header currentPath={location.pathname} />
+        <Header />
         <main className="main-content">
           <Routes>
             <Route path="/" element={
@@ -85,12 +82,8 @@ function AppInner() {
                 <OfficialsList filter={filter} setFilter={setFilter} onSelect={viewOfficial} />
               </div>
             } />
-            <Route path="/official/:id" element={
-              <OfficialDetail onBack={() => navigate(-1)} />
-            } />
-            <Route path="/dashboard" element={
-              <DashboardPage onSelectOfficial={viewOfficial} />
-            } />
+            <Route path="/official/:id" element={<OfficialDetail onBack={() => navigate(-1)} />} />
+            <Route path="/dashboard" element={<DashboardPage onSelectOfficial={viewOfficial} />} />
             <Route path="/allegations" element={<AllegationsPage onSelectOfficial={viewOfficial} />} />
             <Route path="/court-cases" element={<CourtCasesPage onSelectOfficial={viewOfficial} />} />
             <Route path="/news" element={<NewsPage onSelectOfficial={viewOfficial} />} />
@@ -112,13 +105,13 @@ function AppInner() {
         <footer className="app-footer">
           <div className="footer-inner">
             <div>
-              <span className="gradient-text" style={{ fontWeight: 700 }}>Neta Watch</span>
+              <span className="gradient-text" style={{ fontWeight: 700 }}>नेता Watch</span>
               {" "}— Open source political accountability platform
             </div>
             <div className="footer-links">
               <span>Built for transparency 🇮🇳</span>
               <span>·</span>
-              <span>AI by HuggingFace + Groq</span>
+              <span>AI: Groq Llama 3 + HuggingFace</span>
               <span>·</span>
               <span>Data: ECI + public records</span>
               <span>·</span>

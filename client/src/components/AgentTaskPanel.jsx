@@ -9,6 +9,71 @@ const TASKS = [
 
 const TERMINAL_JOB_STATUSES = new Set(["COMPLETED", "FAILED"]);
 
+function DailyAgentStatus() {
+  const [status, setStatus] = useState(null);
+  const [triggering, setTriggering] = useState(false);
+  const [triggerMsg, setTriggerMsg] = useState("");
+
+  useEffect(() => {
+    fetch("/api/agents/daily-status")
+      .then((r) => r.json())
+      .then(setStatus)
+      .catch(() => {});
+  }, []);
+
+  const trigger = async () => {
+    setTriggering(true);
+    setTriggerMsg("");
+    try {
+      const r = await fetch("/api/agents/daily-trigger", { method: "POST" });
+      const j = await r.json();
+      setTriggerMsg(j.message || "Triggered.");
+      setTimeout(() => {
+        fetch("/api/agents/daily-status").then((r) => r.json()).then(setStatus).catch(() => {});
+      }, 2000);
+    } catch {
+      setTriggerMsg("Could not trigger agent.");
+    } finally {
+      setTriggering(false);
+    }
+  };
+
+  return (
+    <div className="daily-agent-status">
+      <div className="das-header">
+        <div className="das-icon">🤖</div>
+        <div>
+          <div className="das-title">Daily AI Agent</div>
+          <div className="das-sub">
+            {status
+              ? status.lastRunAt
+                ? `Last run: ${new Date(status.lastRunAt).toLocaleString("en-IN")} · ${status.runCount} total runs`
+                : "Not yet run — scheduled for 02:00 AM IST daily"
+              : "Loading..."}
+          </div>
+        </div>
+        <button className="btn-ghost" style={{ fontSize: 12, padding: "6px 14px" }} onClick={trigger} disabled={triggering}>
+          {triggering ? "Triggering..." : "▶ Run Now"}
+        </button>
+      </div>
+      {triggerMsg && <div className="das-msg">{triggerMsg}</div>}
+      {status?.lastStatus && (
+        <div className="das-results">
+          <span className="das-chip">📰 {status.lastStatus.newsUpdated} news</span>
+          <span className="das-chip">✅ {status.lastStatus.claimsReverified} claims</span>
+          <span className="das-chip">👤 {status.lastStatus.profilesRefreshed} profiles</span>
+          {status.lastStatus.errors?.length > 0 && (
+            <span className="das-chip warn">⚠️ {status.lastStatus.errors.length} errors</span>
+          )}
+          <span className="das-chip muted">
+            {((status.lastStatus.durationMs || 0) / 1000).toFixed(1)}s
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AgentTaskPanel() {
   const [taskType, setTaskType] = useState("GLOBAL_PERSON_RESEARCH");
   const [subject, setSubject] = useState("");
@@ -20,18 +85,14 @@ export default function AgentTaskPanel() {
 
   useEffect(() => {
     if (!scrapeJob?.id || TERMINAL_JOB_STATUSES.has(scrapeJob.status)) return undefined;
-
     const timer = setInterval(async () => {
       try {
         const response = await fetch(`/api/agents/scrape-jobs/${encodeURIComponent(scrapeJob.id)}`);
         if (!response.ok) return;
         const latest = await response.json();
         setScrapeJob(latest);
-      } catch {
-        // Keep silent; panel already shows latest known state.
-      }
+      } catch {}
     }, 1400);
-
     return () => clearInterval(timer);
   }, [scrapeJob?.id, scrapeJob?.status]);
 
@@ -47,7 +108,6 @@ export default function AgentTaskPanel() {
         type: officialId ? "OFFICIAL_NEWS_SCRAPE" : "FULL_NEWS_SCRAPE",
         officialId: officialId || undefined,
       };
-
       try {
         const response = await fetch("/api/agents/scrape-jobs", {
           method: "POST",
@@ -55,10 +115,7 @@ export default function AgentTaskPanel() {
           body: JSON.stringify(payload),
         });
         const json = await response.json();
-        if (!response.ok) {
-          setError(json?.error || "Could not queue scrape job.");
-          return;
-        }
+        if (!response.ok) { setError(json?.error || "Could not queue scrape job."); return; }
         setScrapeJob(json);
       } catch {
         setError("Could not queue scrape job. Is backend running?");
@@ -70,11 +127,7 @@ export default function AgentTaskPanel() {
 
     const payload =
       taskType === "VERIFY_CLAIM"
-        ? {
-            officialName: subject,
-            claimTitle: details || "User-submitted claim",
-            claimDescription: details,
-          }
+        ? { officialName: subject, claimTitle: details || "User-submitted claim", claimDescription: details }
         : taskType === "SCRAPE_STRATEGY"
           ? { topic: subject || details || "india corruption data sources" }
           : { name: subject || details };
@@ -86,10 +139,7 @@ export default function AgentTaskPanel() {
         body: JSON.stringify({ taskType, payload }),
       });
       const json = await response.json();
-      if (!response.ok) {
-        setError(json?.error || "Task failed.");
-        return;
-      }
+      if (!response.ok) { setError(json?.error || "Task failed."); return; }
       setResult(json);
     } catch {
       setError("Could not run agent task. Is backend running?");
@@ -100,9 +150,11 @@ export default function AgentTaskPanel() {
 
   return (
     <section className="agent-panel">
+      <DailyAgentStatus />
+
       <div className="agent-panel-head">
-        <h3>AI Agent Tasks</h3>
-        <span>Run automated task workflows on live data sources.</span>
+        <h3>Manual AI Tasks</h3>
+        <span>Run one-off research, verification, or scrape workflows.</span>
       </div>
 
       <div className="agent-task-buttons">
@@ -128,26 +180,22 @@ export default function AgentTaskPanel() {
           className="search-box"
           type="text"
           value={subject}
-          onChange={(event) => setSubject(event.target.value)}
+          onChange={(e) => setSubject(e.target.value)}
           placeholder={
-            taskType === "VERIFY_CLAIM"
-              ? "Official name"
-              : taskType === "QUEUE_SCRAPE_JOB"
-                ? "Optional official ID (leave blank for full scrape)"
-                : "Primary subject"
+            taskType === "VERIFY_CLAIM" ? "Official name"
+            : taskType === "QUEUE_SCRAPE_JOB" ? "Optional official ID (leave blank for full scrape)"
+            : "Primary subject"
           }
         />
         <textarea
           className="agent-textarea"
           rows={4}
           value={details}
-          onChange={(event) => setDetails(event.target.value)}
+          onChange={(e) => setDetails(e.target.value)}
           placeholder={
-            taskType === "VERIFY_CLAIM"
-              ? "Claim details to verify"
-              : taskType === "QUEUE_SCRAPE_JOB"
-                ? "Optional notes for your own tracking"
-                : "Optional context or constraints"
+            taskType === "VERIFY_CLAIM" ? "Claim details to verify"
+            : taskType === "QUEUE_SCRAPE_JOB" ? "Optional notes"
+            : "Optional context or constraints"
           }
         />
       </div>
