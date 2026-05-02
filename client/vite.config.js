@@ -4,11 +4,14 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 3000,
+    host: '0.0.0.0',
+    port: 5000,
+    allowedHosts: true,
     proxy: {
-      '/graphql': 'http://localhost:4000',
-      '/uploads': 'http://localhost:4000',
-      '/upload': 'http://localhost:4000',
+      '/graphql': 'http://localhost:8000',
+      '/uploads': 'http://localhost:8000',
+      '/upload': 'http://localhost:8000',
+      '/api': 'http://localhost:8000',
     },
   },
 })

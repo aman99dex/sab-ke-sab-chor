@@ -15,7 +15,7 @@ import { getExternalIntelCacheStats, getPersonProfile, searchPeopleGlobal } from
 import { getImageProxyCacheStats, getProxyImage } from "./imageProxyCache.js";
 import { enqueueScrapeJob, getScrapeJob, getScrapeQueueStats, listScrapeJobs } from "./scrapeQueue.js";
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 8000;
 const ALLOWED_CATEGORIES = ["profiles", "promises", "allegations", "claims", "evidence", "documents"];
 const ALLOWED_MIMETYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 

@@ -1,6 +1,22 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Stars } from "@react-three/drei";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, Component } from "react";
+
+class WebGLErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || null;
+    }
+    return this.props.children;
+  }
+}
 
 function SirenLights({ mode }) {
   const redRef = useRef(null);
@@ -128,25 +144,33 @@ function WireNodes() {
   );
 }
 
+function Background3DCanvas({ mode }) {
+  return (
+    <Canvas
+      camera={{ position: [0, 0, 10], fov: 54 }}
+      gl={{ antialias: true, alpha: true, powerPreference: "high-performance", failIfMajorPerformanceCaveat: false }}
+      style={{ background: "transparent" }}
+      dpr={[1, 1.5]}
+    >
+      <fog attach="fog" args={["#020617", 9, 34]} />
+      <ambientLight intensity={0.24} />
+      <directionalLight position={[3, 9, 6]} intensity={0.54} color="#e2e8f0" />
+
+      <Stars radius={95} depth={52} count={3400} factor={2.8} saturation={0} fade speed={0.3} />
+      <SirenLights mode={mode} />
+      <EvidenceRain />
+      <CrimeGrid />
+      <WireNodes />
+    </Canvas>
+  );
+}
+
 export default function Background3D({ mode = "app" }) {
   return (
     <div className="canvas-bg">
-      <Canvas
-        camera={{ position: [0, 0, 10], fov: 54 }}
-        gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
-        style={{ background: "transparent" }}
-        dpr={[1, 1.5]}
-      >
-        <fog attach="fog" args={["#020617", 9, 34]} />
-        <ambientLight intensity={0.24} />
-        <directionalLight position={[3, 9, 6]} intensity={0.54} color="#e2e8f0" />
-
-        <Stars radius={95} depth={52} count={3400} factor={2.8} saturation={0} fade speed={0.3} />
-        <SirenLights mode={mode} />
-        <EvidenceRain />
-        <CrimeGrid />
-        <WireNodes />
-      </Canvas>
+      <WebGLErrorBoundary fallback={<div className="canvas-bg-fallback" />}>
+        <Background3DCanvas mode={mode} />
+      </WebGLErrorBoundary>
     </div>
   );
 }

@@ -1,9 +1,25 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, Component } from "react";
 import * as THREE from "three";
 
 const MAP_SOURCE = "/maps/india-states-simplified.geojson";
+
+class WebGLErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || null;
+    }
+    return this.props.children;
+  }
+}
 
 function projectLonLat(lon, lat) {
   const refLat = 22.5;
@@ -197,6 +213,40 @@ function SceneCamera({ focused, isExiting }) {
   return null;
 }
 
+function IntroCanvas({ segments, focused, isExiting, selectedState, hoveredState, setHoveredState, setSelectedState }) {
+  return (
+    <Canvas camera={{ position: [0, 0.5, 15], fov: 40 }} dpr={[1, 1.6]} gl={{ failIfMajorPerformanceCaveat: false }}>
+      <fog attach="fog" args={["#020617", 8, 28]} />
+      <ambientLight intensity={0.35} />
+      <directionalLight position={[9, 10, 6]} intensity={1.15} color="#f8fafc" />
+      <pointLight position={[-7, -2, 5]} intensity={0.95} color="#ef4444" />
+      <pointLight position={[8, 1, 5]} intensity={0.72} color="#38bdf8" />
+
+      <Stars radius={95} depth={48} count={4800} factor={3.4} saturation={0} fade speed={0.8} />
+      {segments.length > 0 && (
+        <IndiaStatesMap
+          segments={segments}
+          focused={focused || isExiting}
+          selectedState={selectedState}
+          hoveredState={hoveredState}
+          setHoveredState={setHoveredState}
+          setSelectedState={setSelectedState}
+        />
+      )}
+      <SceneCamera focused={focused} isExiting={isExiting} />
+
+      <OrbitControls
+        enableZoom={false}
+        enablePan={false}
+        maxPolarAngle={Math.PI / 1.55}
+        minPolarAngle={Math.PI / 2.55}
+        autoRotate={!focused && !isExiting}
+        autoRotateSpeed={0.22}
+      />
+    </Canvas>
+  );
+}
+
 export default function IndiaIntro3D({ onEnter, isExiting }) {
   const [focused, setFocused] = useState(false);
   const [launchQueued, setLaunchQueued] = useState(false);
@@ -242,38 +292,20 @@ export default function IndiaIntro3D({ onEnter, isExiting }) {
   return (
     <section className="india-intro-wrap">
       <div className="india-intro-canvas">
-        <Canvas camera={{ position: [0, 0.5, 15], fov: 40 }} dpr={[1, 1.6]}>
-          <fog attach="fog" args={["#020617", 8, 28]} />
-          <ambientLight intensity={0.35} />
-          <directionalLight position={[9, 10, 6]} intensity={1.15} color="#f8fafc" />
-          <pointLight position={[-7, -2, 5]} intensity={0.95} color="#ef4444" />
-          <pointLight position={[8, 1, 5]} intensity={0.72} color="#38bdf8" />
-
-          <Stars radius={95} depth={48} count={4800} factor={3.4} saturation={0} fade speed={0.8} />
-          {segments.length > 0 && (
-            <IndiaStatesMap
-              segments={segments}
-              focused={focused || isExiting}
-              selectedState={selectedState}
-              hoveredState={hoveredState}
-              setHoveredState={setHoveredState}
-              setSelectedState={(stateName) => {
-                setSelectedState(stateName);
-                setFocused(true);
-              }}
-            />
-          )}
-          <SceneCamera focused={focused} isExiting={isExiting} />
-
-          <OrbitControls
-            enableZoom={false}
-            enablePan={false}
-            maxPolarAngle={Math.PI / 1.55}
-            minPolarAngle={Math.PI / 2.55}
-            autoRotate={!focused && !isExiting}
-            autoRotateSpeed={0.22}
+        <WebGLErrorBoundary fallback={<div className="india-intro-canvas-fallback" />}>
+          <IntroCanvas
+            segments={segments}
+            focused={focused}
+            isExiting={isExiting}
+            selectedState={selectedState}
+            hoveredState={hoveredState}
+            setHoveredState={setHoveredState}
+            setSelectedState={(stateName) => {
+              setSelectedState(stateName);
+              setFocused(true);
+            }}
           />
-        </Canvas>
+        </WebGLErrorBoundary>
       </div>
 
       <div className="india-intro-overlay">

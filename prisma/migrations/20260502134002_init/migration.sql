@@ -1,6 +1,6 @@
 -- CreateTable
 CREATE TABLE "Official" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "role" TEXT NOT NULL,
     "level" TEXT NOT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE "Official" (
     "constituencyType" TEXT,
     "state" TEXT NOT NULL,
     "district" TEXT,
-    "assets" REAL,
+    "assets" DOUBLE PRECISION,
     "criminalCases" INTEGER NOT NULL DEFAULT 0,
     "educationQualification" TEXT,
     "websiteUrl" TEXT,
@@ -23,30 +23,33 @@ CREATE TABLE "Official" (
     "email" TEXT,
     "phone" TEXT,
     "sourceUrl" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Official_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Promise" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "officialId" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "description" TEXT,
-    "budgetAllotted" REAL,
-    "budgetSpent" REAL,
+    "budgetAllotted" DOUBLE PRECISION,
+    "budgetSpent" DOUBLE PRECISION,
     "status" TEXT NOT NULL DEFAULT 'NOT_STARTED',
     "proofImages" TEXT,
     "sourceUrl" TEXT,
     "deadline" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Promise_officialId_fkey" FOREIGN KEY ("officialId") REFERENCES "Official" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Promise_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Allegation" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "officialId" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "description" TEXT,
@@ -54,14 +57,15 @@ CREATE TABLE "Allegation" (
     "status" TEXT NOT NULL DEFAULT 'UNVERIFIED',
     "proofImages" TEXT,
     "sourceUrl" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Allegation_officialId_fkey" FOREIGN KEY ("officialId") REFERENCES "Official" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Allegation_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Claim" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "officialId" TEXT NOT NULL,
     "submittedBy" TEXT NOT NULL DEFAULT 'Anonymous',
     "type" TEXT NOT NULL,
@@ -74,16 +78,15 @@ CREATE TABLE "Claim" (
     "aiModel" TEXT,
     "linkedPromiseId" TEXT,
     "linkedAllegationId" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "verifiedAt" DATETIME,
-    CONSTRAINT "Claim_officialId_fkey" FOREIGN KEY ("officialId") REFERENCES "Official" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "Claim_linkedPromiseId_fkey" FOREIGN KEY ("linkedPromiseId") REFERENCES "Promise" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
-    CONSTRAINT "Claim_linkedAllegationId_fkey" FOREIGN KEY ("linkedAllegationId") REFERENCES "Allegation" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "verifiedAt" TIMESTAMP(3),
+
+    CONSTRAINT "Claim_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "CourtCase" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "officialId" TEXT NOT NULL,
     "caseNumber" TEXT NOT NULL,
     "court" TEXT NOT NULL,
@@ -97,14 +100,15 @@ CREATE TABLE "CourtCase" (
     "judgmentSummary" TEXT,
     "sourceUrl" TEXT,
     "source" TEXT NOT NULL DEFAULT 'MANUAL',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "CourtCase_officialId_fkey" FOREIGN KEY ("officialId") REFERENCES "Official" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "CourtCase_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "FIR" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "officialId" TEXT NOT NULL,
     "firNumber" TEXT NOT NULL,
     "policeStation" TEXT NOT NULL,
@@ -115,54 +119,58 @@ CREATE TABLE "FIR" (
     "status" TEXT NOT NULL DEFAULT 'REGISTERED',
     "description" TEXT,
     "sourceUrl" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "FIR_officialId_fkey" FOREIGN KEY ("officialId") REFERENCES "Official" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "FIR_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "AssetDeclaration" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "officialId" TEXT NOT NULL,
     "year" INTEGER NOT NULL,
     "electionType" TEXT,
-    "movableAssets" REAL,
-    "immovableAssets" REAL,
-    "totalAssets" REAL,
-    "liabilities" REAL,
-    "spouseAssets" REAL,
+    "movableAssets" DOUBLE PRECISION,
+    "immovableAssets" DOUBLE PRECISION,
+    "totalAssets" DOUBLE PRECISION,
+    "liabilities" DOUBLE PRECISION,
+    "spouseAssets" DOUBLE PRECISION,
     "sourceUrl" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "AssetDeclaration_officialId_fkey" FOREIGN KEY ("officialId") REFERENCES "Official" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "AssetDeclaration_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "NewsArticle" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "summary" TEXT,
     "url" TEXT NOT NULL,
     "source" TEXT NOT NULL,
-    "publishedAt" DATETIME NOT NULL,
+    "publishedAt" TIMESTAMP(3) NOT NULL,
     "sentiment" TEXT,
     "category" TEXT,
     "content" TEXT,
     "aiVerified" BOOLEAN NOT NULL DEFAULT false,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "NewsArticle_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "NewsArticleOfficial" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "articleId" TEXT NOT NULL,
     "officialId" TEXT NOT NULL,
-    CONSTRAINT "NewsArticleOfficial_articleId_fkey" FOREIGN KEY ("articleId") REFERENCES "NewsArticle" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "NewsArticleOfficial_officialId_fkey" FOREIGN KEY ("officialId") REFERENCES "Official" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+
+    CONSTRAINT "NewsArticleOfficial_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "RTIResponse" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "officialId" TEXT,
     "department" TEXT NOT NULL,
     "question" TEXT NOT NULL,
@@ -172,14 +180,15 @@ CREATE TABLE "RTIResponse" (
     "status" TEXT NOT NULL DEFAULT 'FILED',
     "documentUrl" TEXT,
     "submittedBy" TEXT NOT NULL DEFAULT 'Anonymous',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "RTIResponse_officialId_fkey" FOREIGN KEY ("officialId") REFERENCES "Official" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "RTIResponse_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "WhistleblowerReport" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "description" TEXT NOT NULL,
     "evidence" TEXT,
@@ -189,30 +198,34 @@ CREATE TABLE "WhistleblowerReport" (
     "submitterContact" TEXT,
     "aiVerificationNote" TEXT,
     "aiConfidence" INTEGER,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "WhistleblowerReport_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "WhistleblowerReportOfficial" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "reportId" TEXT NOT NULL,
     "officialId" TEXT NOT NULL,
-    CONSTRAINT "WhistleblowerReportOfficial_reportId_fkey" FOREIGN KEY ("reportId") REFERENCES "WhistleblowerReport" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "WhistleblowerReportOfficial_officialId_fkey" FOREIGN KEY ("officialId") REFERENCES "Official" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+
+    CONSTRAINT "WhistleblowerReportOfficial_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "ScrapeJob" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "source" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'QUEUED',
     "targetId" TEXT,
     "result" TEXT,
     "error" TEXT,
-    "startedAt" DATETIME,
-    "completedAt" DATETIME,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "startedAt" TIMESTAMP(3),
+    "completedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ScrapeJob_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -328,3 +341,42 @@ CREATE INDEX "ScrapeJob_source_idx" ON "ScrapeJob"("source");
 
 -- CreateIndex
 CREATE INDEX "ScrapeJob_status_idx" ON "ScrapeJob"("status");
+
+-- AddForeignKey
+ALTER TABLE "Promise" ADD CONSTRAINT "Promise_officialId_fkey" FOREIGN KEY ("officialId") REFERENCES "Official"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Allegation" ADD CONSTRAINT "Allegation_officialId_fkey" FOREIGN KEY ("officialId") REFERENCES "Official"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Claim" ADD CONSTRAINT "Claim_officialId_fkey" FOREIGN KEY ("officialId") REFERENCES "Official"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Claim" ADD CONSTRAINT "Claim_linkedPromiseId_fkey" FOREIGN KEY ("linkedPromiseId") REFERENCES "Promise"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Claim" ADD CONSTRAINT "Claim_linkedAllegationId_fkey" FOREIGN KEY ("linkedAllegationId") REFERENCES "Allegation"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CourtCase" ADD CONSTRAINT "CourtCase_officialId_fkey" FOREIGN KEY ("officialId") REFERENCES "Official"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "FIR" ADD CONSTRAINT "FIR_officialId_fkey" FOREIGN KEY ("officialId") REFERENCES "Official"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AssetDeclaration" ADD CONSTRAINT "AssetDeclaration_officialId_fkey" FOREIGN KEY ("officialId") REFERENCES "Official"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "NewsArticleOfficial" ADD CONSTRAINT "NewsArticleOfficial_articleId_fkey" FOREIGN KEY ("articleId") REFERENCES "NewsArticle"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "NewsArticleOfficial" ADD CONSTRAINT "NewsArticleOfficial_officialId_fkey" FOREIGN KEY ("officialId") REFERENCES "Official"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RTIResponse" ADD CONSTRAINT "RTIResponse_officialId_fkey" FOREIGN KEY ("officialId") REFERENCES "Official"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "WhistleblowerReportOfficial" ADD CONSTRAINT "WhistleblowerReportOfficial_reportId_fkey" FOREIGN KEY ("reportId") REFERENCES "WhistleblowerReport"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "WhistleblowerReportOfficial" ADD CONSTRAINT "WhistleblowerReportOfficial_officialId_fkey" FOREIGN KEY ("officialId") REFERENCES "Official"("id") ON DELETE CASCADE ON UPDATE CASCADE;
