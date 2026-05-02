@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
-const SCALE = 22;
-const CX = 300;
-const CY = 380;
+// Projection tuned so the full GoI-claimed territory (north to ~37.2°N,
+// west to ~72.8°E, including PoK + Aksai Chin) fits the viewBox.
+const SCALE = 21;
+const CX = 295;
+const CY = 400;
 const REF_LAT = 22.5;
 const REF_LON = 82.5;
 
@@ -64,7 +66,9 @@ const STATE_COLORS = {
   "Haryana": "#4ade80",
   "Uttarakhand": "#fb7185",
   "Himachal Pradesh": "#a3e635",
-  "Jammu & Kashmir": "#c084fc",
+  // GoI-official names (match GeoJSON property)
+  "Jammu and Kashmir": "#c084fc",
+  "Ladakh": "#818cf8",
   "Delhi": "#fbbf24",
   "Tamil Nadu": "#2dd4bf",
   "default": "#0ea5e9",
